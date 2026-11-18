@@ -58,7 +58,7 @@ class CoreTests(unittest.TestCase):
         folder = self.skills / "broken"
         folder.mkdir()
         (folder / "SKILL.md").write_text(
-            "---\\nname: broken-skill\\ndescription: Missing closing delimiter\\n# content\\n",
+            "---\nname: broken-skill\ndescription: Missing closing delimiter\n# content\n",
             encoding="utf-8",
         )
         with self.assertRaisesRegex(ValueError, "unterminated frontmatter"):
