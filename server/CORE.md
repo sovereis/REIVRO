@@ -14,8 +14,8 @@ No third-party dependencies are required. On Windows PowerShell, use the same `p
 
 ## Policy and limitations
 
-- Current allowed capability: reading local skill definitions only (`local:read-skill-definition`). Neither write operations nor network calls are implemented.
-- Files and folder symlinks are not followed; duplicate skill names and malformed metadata cause errors.
-- Matching uses literal token overlaps and should not be mistaken for semantic/agent selection or proof of skill execution. No match returns an empty list.
+- The `local:read-skill-definition` value is an informational label, **not** a filesystem permission enforcement mechanism. The CLI currently performs only local skill-definition reads; neither write operations nor network calls are implemented.
+- Symlinked skill roots, child directories, and `SKILL.md` files are rejected or skipped. Duplicate skill names and malformed or unterminated frontmatter cause errors.
+- Matching uses literal token overlap with a small English stopword filter and should not be mistaken for semantic/agent selection or proof of skill execution. Stopword-only input or no match returns an empty list.
 - Repository root path and Python module invocation are intentionally explicit to avoid hidden environment assumptions.
 - Future milestones: explicit permission grants and approvals; adapter interface; read-only GitHub fetch; orchestrated source-grounded output; audit logs and end-to-end evaluations. Each requires independent tests.
