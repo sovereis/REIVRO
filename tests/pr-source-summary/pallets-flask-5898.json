@@ -1,0 +1,62 @@
+{
+  "pr_url": "https://github.com/pallets/flask/pull/5898",
+  "checked_on": "2026-11-18",
+  "status": "summarized",
+  "verified_facts": [
+    {
+      "claim": "GitHub records this PR as merged.",
+      "sources": [
+        {
+          "kind": "metadata",
+          "url": "https://github.com/pallets/flask/pull/5898",
+          "locator": "merged",
+          "excerpt": "true"
+        }
+      ]
+    },
+    {
+      "claim": "The PR changes the default status code from 302 to 303 in both flask.redirect and the application redirect method.",
+      "sources": [
+        {
+          "kind": "diff",
+          "url": "https://github.com/pallets/flask/pull/5898/files#diff-1f51c8ded4d4ff7e13badab599ef22436c529c2b5f9c25dc6250c1f9fd985440",
+          "locator": "src/flask/helpers.py",
+          "excerpt": "-    location: str, code: int = 302, Response: type[BaseResponse] | None = None\n+    location: str, code: int = 303, Response: type[BaseResponse] | None = None"
+        },
+        {
+          "kind": "diff",
+          "url": "https://github.com/pallets/flask/pull/5898/files#diff-c57b8f34cffef9948b35aec94cb2364f75c1a2854064a13bf8216603cb1f607b",
+          "locator": "src/flask/sansio/app.py",
+          "excerpt": "-    def redirect(self, location: str, code: int = 302) -> BaseResponse:\n+    def redirect(self, location: str, code: int = 303) -> BaseResponse:"
+        }
+      ]
+    },
+    {
+      "claim": "The changelog says the 303 default tells clients to switch to GET.",
+      "sources": [
+        {
+          "kind": "diff",
+          "url": "https://github.com/pallets/flask/pull/5898/files#diff-ff3c479edefad986d2fe6fe7ead575a46b086e3bbcf0ccc86d85efc4a4c63c79",
+          "locator": "CHANGES.rst",
+          "excerpt": "+    This tells the client to always switch to ``GET``, rather than only"
+        }
+      ]
+    },
+    {
+      "claim": "The API documentation also changes the status in its example of a default-route redirect from 301 to 308.",
+      "sources": [
+        {
+          "kind": "diff",
+          "url": "https://github.com/pallets/flask/pull/5898/files#diff-0ee295c29def16f570f86378eff8ba37315e464d415e731d5d8ea2e67ce16f68",
+          "locator": "docs/api.rst",
+          "excerpt": "-form with a 301 redirect. In the above example, ``/users/page/1`` will\n+form with a 308 redirect. In the above example, ``/users/page/1`` will"
+        }
+      ]
+    }
+  ],
+  "assumptions": [],
+  "limitations": [
+    "Client behavior and CI results were not independently checked."
+  ],
+  "blocked_reason": null
+}
