@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 
 _TOKEN = re.compile(r"[a-z0-9]+")
+_STOPWORDS = frozenset({"a", "an", "and", "are", "at", "by", "for", "from", "in", "is", "of", "on", "or", "the", "to", "with"})
 
 
 @dataclass(frozen=True)
@@ -19,10 +20,9 @@ class Skill:
 def _frontmatter(text: str) -> dict[str, str]:
     if not text.startswith("---\n"):
         raise ValueError("missing YAML frontmatter")
-    try:
-        header = text.split("\n---\n", 1)[0][4:]
-    except IndexError as exc:
-        raise ValueError("unterminated frontmatter") from exc
+    header, separator, _body = text[4:].partition("\n---\n")
+    if not separator:
+        raise ValueError("unterminated frontmatter")
     fields: dict[str, str] = {}
     for line in header.splitlines():
         if not line.strip():
@@ -44,6 +44,8 @@ def _frontmatter(text: str) -> dict[str, str]:
 
 def discover(skills_dir: Path) -> list[Skill]:
     """Find one SKILL.md per immediate skill subfolder; don't follow symlinks."""
+    if skills_dir.is_symlink():
+        raise ValueError(f"symlinked skills root is not allowed: {skills_dir}")
     if not skills_dir.is_dir():
         raise FileNotFoundError(f"skills directory not found: {skills_dir}")
     found: list[Skill] = []
@@ -65,7 +67,7 @@ def discover(skills_dir: Path) -> list[Skill]:
 
 
 def _tokens(text: str) -> set[str]:
-    return set(_TOKEN.findall(text.lower()))
+    return set(_TOKEN.findall(text.lower())) - _STOPWORDS
 
 
 def match(task: str, skills: list[Skill]) -> list[tuple[Skill, int]]:
