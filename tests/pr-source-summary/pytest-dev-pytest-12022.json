@@ -1,0 +1,73 @@
+{
+  "pr_url": "https://github.com/pytest-dev/pytest/pull/12022",
+  "checked_on": "2026-11-18",
+  "status": "summarized",
+  "verified_facts": [
+    {
+      "claim": "GitHub records this PR as merged.",
+      "sources": [
+        {
+          "kind": "metadata",
+          "url": "https://github.com/pytest-dev/pytest/pull/12022",
+          "locator": "merged",
+          "excerpt": "true"
+        }
+      ]
+    },
+    {
+      "claim": "The author reports that the prior change could cause session fixture teardown to execute multiple times in pytest-xdist.",
+      "sources": [
+        {
+          "kind": "description",
+          "url": "https://github.com/pytest-dev/pytest/pull/12022",
+          "locator": "body",
+          "excerpt": "pytest-xdist necessarily has special handling of `--maxfail` and session fixture teardown get executed multiple times with the change."
+        }
+      ]
+    },
+    {
+      "claim": "The patch removes the branch that forced nextitem to None when the pytest session was about to fail or stop.",
+      "sources": [
+        {
+          "kind": "diff",
+          "url": "https://github.com/pytest-dev/pytest/pull/12022/files#diff-cbff8d3c291338e760a5764d87999a47bb91b3960b171c56acc849902435c772",
+          "locator": "src/_pytest/runner.py",
+          "excerpt": "-    if item.session.shouldfail or item.session.shouldstop:\n-        nextitem = None"
+        }
+      ]
+    },
+    {
+      "claim": "The patch removes two regression tests for higher-scoped fixture teardown after early termination.",
+      "sources": [
+        {
+          "kind": "diff",
+          "url": "https://github.com/pytest-dev/pytest/pull/12022/files#diff-b9762f58e667c5d15166e53da46692975965f8667e264431a935e9dd2d5d5703",
+          "locator": "testing/test_runner.py",
+          "excerpt": "-def test_teardown_session_failed(pytester: Pytester) -> None:"
+        },
+        {
+          "kind": "diff",
+          "url": "https://github.com/pytest-dev/pytest/pull/12022/files#diff-b9762f58e667c5d15166e53da46692975965f8667e264431a935e9dd2d5d5703",
+          "locator": "testing/test_runner.py",
+          "excerpt": "-def test_teardown_session_stopped(pytester: Pytester) -> None:"
+        }
+      ]
+    },
+    {
+      "claim": "The changelog describes the earlier teardown reporting change as reverted in pytest 8.0.2.",
+      "sources": [
+        {
+          "kind": "diff",
+          "url": "https://github.com/pytest-dev/pytest/pull/12022/files#diff-e02b5aa2806cf9086c18c4d38b880df457d9313bf02ba108d58e67336abbab66",
+          "locator": "doc/en/changelog.rst",
+          "excerpt": "+  NOTE: This change was reverted in pytest 8.0.2 to fix a `regression <https://github.com/pytest-dev/pytest-xdist/issues/1024>`_ it caused in pytest-xdist."
+        }
+      ]
+    }
+  ],
+  "assumptions": [],
+  "limitations": [
+    "The pytest-xdist regression was not reproduced, and CI results were not checked."
+  ],
+  "blocked_reason": null
+}

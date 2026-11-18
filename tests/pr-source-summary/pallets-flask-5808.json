@@ -1,0 +1,45 @@
+{
+  "pr_url": "https://github.com/pallets/flask/pull/5808",
+  "checked_on": "2026-11-18",
+  "status": "summarized",
+  "verified_facts": [
+    {
+      "claim": "GitHub records this PR as merged.",
+      "sources": [
+        {
+          "kind": "metadata",
+          "url": "https://github.com/pallets/flask/pull/5808",
+          "locator": "merged",
+          "excerpt": "true"
+        }
+      ]
+    },
+    {
+      "claim": "The patch widens the filename annotation of select_jinja_autoescape from str to str | None.",
+      "sources": [
+        {
+          "kind": "diff",
+          "url": "https://github.com/pallets/flask/pull/5808/files#diff-c57b8f34cffef9948b35aec94cb2364f75c1a2854064a13bf8216603cb1f607b",
+          "locator": "src/flask/sansio/app.py",
+          "excerpt": "-    def select_jinja_autoescape(self, filename: str) -> bool:\n+    def select_jinja_autoescape(self, filename: str | None) -> bool:"
+        }
+      ]
+    },
+    {
+      "claim": "The author says the existing implementation already checks for None and returns True.",
+      "sources": [
+        {
+          "kind": "description",
+          "url": "https://github.com/pallets/flask/pull/5808",
+          "locator": "body",
+          "excerpt": "the filename is checked against a None value and returns True"
+        }
+      ]
+    }
+  ],
+  "assumptions": [],
+  "limitations": [
+    "The cited patch shows the annotation change. Runtime behavior and CI results were not independently checked."
+  ],
+  "blocked_reason": null
+}
