@@ -11,4 +11,6 @@ The [catalog](CATALOG.md) records a skill's current development stage. Use the e
 
 Record the skill ID, tested revision, environment, and evidence location in the review. Preserve blocked results with their cause. Scope any compatibility statement to the agents and versions actually tested. Record separate results for each additional agent before claiming cross-agent compatibility.
 
-The prototype labels for Regression Test Generator and Test Failure Diagnosis reflect the supplied catalog status. The catalog assigns no live validation to either skill. The current Pull Request Summary status is based on the [reported Codex results](../tests/pr-source-summary/REPORT.md).
+Test Failure Diagnosis retains its reported prototype status. Regression Test Generator advanced to VALIDATED — PENDING MERGE after both proposed tests failed with the expected symptoms on affected upstream revisions and passed on fixing revisions. [Upstream validation report](../tests/bug-regression-test/REPORT.md)
+
+The current Pull Request Summary status is based on the [reported Codex results](../tests/pr-source-summary/REPORT.md).

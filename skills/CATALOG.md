@@ -8,7 +8,7 @@ See the [status guide](STATUS.md) for advancement evidence and the [roadmap](ROA
 
 | Category | Total | PLANNED | PROTOTYPE — NOT LIVE VALIDATED | VALIDATED — PENDING MERGE |
 | --- | ---: | ---: | ---: | ---: |
-| Engineering and release | 12 | 9 | 2 | 1 |
+| Engineering and release | 12 | 9 | 1 | 2 |
 | Governance and verification | 9 | 9 | 0 | 0 |
 | Research, memory, and ML | 5 | 5 | 0 | 0 |
 | Product, design, and web quality | 10 | 10 | 0 | 0 |
@@ -16,9 +16,11 @@ See the [status guide](STATUS.md) for advancement evidence and the [roadmap](ROA
 | Content and media | 11 | 11 | 0 | 0 |
 | Operations and productivity | 15 | 15 | 0 | 0 |
 | Data and analytics | 8 | 8 | 0 | 0 |
-| **Total** | **84** | **81** | **2** | **1** |
+| **Total** | **84** | **81** | **1** | **2** |
 
 Pull Request Summary is registered under its official catalog name. Its implementation slug is `pr-source-summary`. The reported Codex validation matched 14 source references across three public GitHub PRs and passed 13 regression tests. Approval and merge are pending. [Validation report](../tests/pr-source-summary/REPORT.md)
+
+Regression Test Generator (`bug-regression-test`) reproduced two upstream bugs on affected pytest revisions and passed both probes on the corresponding fixing revisions. [Upstream validation report](../tests/bug-regression-test/REPORT.md)
 
 ## Engineering and release
 
@@ -32,7 +34,7 @@ Pull Request Summary is registered under its official catalog name. Its implemen
 | SCOP-006 | Deployment Manager | Plans deployments, rollback, and post-release checks. | PLANNED | Checklist Before Release, CI/CD |
 | SCOP-007 | Checklist Before Release | Produces release readiness checks and evidence requirements. | PLANNED | QA Engineer, CI results |
 | SCOP-008 | Pull Request Summary | Summarizes GitHub PRs with claim-level source references. | VALIDATED — PENDING MERGE | GitHub metadata and diffs |
-| SCOP-009 | Regression Test Generator | Drafts targeted tests for defects or behavior changes. | PROTOTYPE — NOT LIVE VALIDATED | QA Engineer, test runners |
+| SCOP-009 | Regression Test Generator | Drafts targeted tests for defects or behavior changes. | VALIDATED — PENDING MERGE | QA Engineer, test runners |
 | SCOP-010 | Library Migration | Plans dependency changes and compatibility checks. | PLANNED | Documentation Research, package managers |
 | SCOP-011 | Code Documentation | Drafts developer documentation from code and examples. | PLANNED | Documentation Research, repository files |
 | SCOP-012 | Test Failure Diagnosis | Interprets failing test output and prioritizes likely causes. | PROTOTYPE — NOT LIVE VALIDATED | Test runners, CI artifacts |
