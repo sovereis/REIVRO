@@ -1,0 +1,41 @@
+{
+  "issue_url": "https://github.com/pytest-dev/pytest/issues/12021",
+  "status": "proposed",
+  "evidence": [
+    {
+      "role": "trigger",
+      "url": "https://github.com/pytest-dev/pytest/issues/12021",
+      "quote": "When using `--maxfail` and the max fails is reached in a certain worker"
+    },
+    {
+      "role": "symptom",
+      "url": "https://github.com/pytest-dev/pytest/issues/12021",
+      "quote": "the worker executes session fixture teardown twice."
+    },
+    {
+      "role": "trigger",
+      "url": "https://github.com/pytest-dev/pytest-xdist/issues/1024",
+      "quote": "pytest test_parallel.py  -n 2  -s --maxfail=1"
+    }
+  ],
+  "proposal": {
+    "framework": "pytest subprocess integration test using pytester with pytest-xdist",
+    "setup": "Build a local suite with one deliberate assertion failure and enough passing cases to involve two workers. Use an autouse session fixture with setup and teardown markers in separate per-worker files under a temporary directory.",
+    "steps": [
+      "Run the synthetic suite under pytest-xdist with two workers and --maxfail=1. Use bounded worker coordination to ensure both workers have entered the fixture before the deliberate failure.",
+      "Confirm the run reached the deliberate failure. Read setup and teardown counts for every worker that entered the fixture.",
+      "Run the same suite without --maxfail as a control. Compare the proposed check on pinned affected and corrected pytest revisions with the same xdist version."
+    ],
+    "assertion": "The subprocess reports the deliberate test failure, both workers record fixture setup, and each participating worker records exactly one corresponding teardown.",
+    "predicted_failure": "The affected --maxfail path records duplicate teardown for a worker. Worker startup errors, missing markers, unrelated exceptions, and coordination timeouts are incomplete runs.",
+    "rationale": "Inferred: each worker should finalize its session fixture once after the failure limit stops the run. Confirm the assertion and the activation conditions against the upstream fix and the no-limit control."
+  },
+  "upstream_execution": {
+    "status": "not_run",
+    "reason": "Only the proposal and its source quotations were validated."
+  },
+  "limitations": [
+    "Worker scheduling and dependency versions can affect reproducibility. Coordination and revision selection are still proposed.",
+    "The linked xdist issue reports duplicate fixture execution, while the primary pytest issue describes duplicate teardown. The proposed assertion targets the primary issue."
+  ]
+}

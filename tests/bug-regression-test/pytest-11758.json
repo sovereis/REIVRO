@@ -1,0 +1,41 @@
+{
+  "issue_url": "https://github.com/pytest-dev/pytest/issues/11758",
+  "status": "proposed",
+  "evidence": [
+    {
+      "role": "trigger",
+      "url": "https://github.com/pytest-dev/pytest/issues/11758",
+      "quote": "it's enough to know that `source` has length zero so `source[-1]` will fail here?"
+    },
+    {
+      "role": "symptom",
+      "url": "https://github.com/pytest-dev/pytest/issues/11758",
+      "quote": "IndexError: string index out of range"
+    },
+    {
+      "role": "trigger",
+      "url": "https://github.com/pytest-dev/pytest/issues/11758",
+      "quote": "In our prerelease CIs we now get an internal error with 8.0.0rc1:"
+    }
+  ],
+  "proposal": {
+    "framework": "pytest unit test in the terminal writer test suite",
+    "setup": "Create a TerminalWriter around an in-memory stream. Enable markup and code highlighting and provide the project's supported Pygments dependency. Use the private highlighting method because it isolates the reporting failure from the unrelated MNE test.",
+    "steps": [
+      "Call writer._highlight with an empty Python source string.",
+      "Call the same method with a nonempty Python source line as a control for the highlighting setup.",
+      "Run the test against the reported 8.0.0rc1 baseline and a separately identified corrected revision in equivalent environments."
+    ],
+    "assertion": "The empty source call returns an empty string without an IndexError. The nonempty control yields nonempty output.",
+    "predicted_failure": "On the affected path, _highlight raises IndexError while accessing source[-1]. A missing Pygments dependency or disabled highlighting does not reproduce that failure.",
+    "rationale": "Inferred: highlighting zero source characters should produce zero output and allow error reporting to proceed. Confirm the expectation against the maintainer fix or an existing terminal writer test."
+  },
+  "upstream_execution": {
+    "status": "not_run",
+    "reason": "Only the proposal and its source quotations were validated."
+  },
+  "limitations": [
+    "The isolated private method test may need adjustment for the project's test helpers and may omit conditions from the original MNE traceback.",
+    "A corrected revision and dependency matrix were not verified."
+  ]
+}
