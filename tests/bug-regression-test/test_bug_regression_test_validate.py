@@ -1,11 +1,17 @@
 """Regression tests for proposal evidence and execution claims."""
 
+from importlib.util import module_from_spec, spec_from_file_location
 import json
 from pathlib import Path
 import unittest
 from unittest.mock import Mock
 
-from validate import validate, verify_sources
+validator_path = Path(__file__).with_name("validate.py")
+spec = spec_from_file_location("scop_bug_regression_test_validator", validator_path)
+if spec is None or spec.loader is None:
+    raise ImportError(f"Cannot load validator from {validator_path}")
+validator = module_from_spec(spec)
+spec.loader.exec_module(validator)
 
 
 class ProposalValidationTests(unittest.TestCase):
@@ -15,10 +21,10 @@ class ProposalValidationTests(unittest.TestCase):
         )
 
     def test_complete_record_and_exact_quotes(self):
-        validate(self.record)
+        validator.validate(self.record)
         body = "\r\n".join(item["quote"] for item in self.record["evidence"])
         fetch = Mock(return_value=body)
-        verify_sources(self.record, fetch)
+        validator.verify_sources(self.record, fetch)
         fetch.assert_called_once_with(self.record["issue_url"])
 
     def test_incomplete_bug_evidence(self):
@@ -29,37 +35,37 @@ class ProposalValidationTests(unittest.TestCase):
                     item for item in self.record["evidence"] if item["role"] != missing_role
                 ]
                 with self.assertRaisesRegex(ValueError, "incomplete evidence"):
-                    validate(original)
+                    validator.validate(original)
 
     def test_missing_source_reference(self):
         del self.record["evidence"][0]["url"]
         with self.assertRaisesRegex(ValueError, "source evidence has missing"):
-            validate(self.record)
+            validator.validate(self.record)
 
     def test_unrelated_primary_issue(self):
         self.record["issue_url"] = "https://github.com/pytest-dev/pytest/issues/1"
         with self.assertRaisesRegex(ValueError, "primary issue reference"):
-            validate(self.record)
+            validator.validate(self.record)
 
     def test_unsupported_quotation(self):
-        validate(self.record)
+        validator.validate(self.record)
         with self.assertRaisesRegex(ValueError, "unsupported evidence quotation"):
-            verify_sources(self.record, lambda _: "No matching evidence.")
+            validator.verify_sources(self.record, lambda _: "No matching evidence.")
 
     def test_unsupported_execution_claim(self):
         self.record["upstream_execution"]["status"] = "passed"
         with self.assertRaisesRegex(ValueError, "unsupported upstream execution claim"):
-            validate(self.record)
+            validator.validate(self.record)
 
     def test_unsupported_fact_field(self):
         self.record["evidence"][0]["claim"] = "The fix eliminated every related failure."
         with self.assertRaisesRegex(ValueError, "unsupported fields"):
-            validate(self.record)
+            validator.validate(self.record)
 
     def test_unlabeled_inference(self):
         self.record["proposal"]["rationale"] = "The issue proves the proposed result."
         with self.assertRaisesRegex(ValueError, "must identify inferred behavior"):
-            validate(self.record)
+            validator.validate(self.record)
 
 
 if __name__ == "__main__":
