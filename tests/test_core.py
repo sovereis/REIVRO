@@ -64,9 +64,20 @@ class CoreTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unterminated frontmatter"):
             discover(self.skills)
 
+    def test_frontmatter_closing_delimiter_at_eof(self):
+        folder = self.skills / "eof"
+        folder.mkdir()
+        (folder / "SKILL.md").write_text(
+            "---\nname: eof-skill\ndescription: Valid at EOF\n---",
+            encoding="utf-8",
+        )
+        found = discover(self.skills)
+        self.assertEqual([skill.name for skill in found], ["eof-skill"])
+
     def test_symlink_root_rejected(self):
         self.add("ok", "skill-one", "description")
-        linked_root = self.skills.parent / "linked-root"
+        # Keep the link inside this test's own temporary directory.
+        linked_root = self.skills / "linked-root"
         try:
             linked_root.symlink_to(self.skills, target_is_directory=True)
         except OSError:
