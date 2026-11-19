@@ -3,13 +3,19 @@
 import contextlib
 import copy
 import io
+from importlib.util import module_from_spec, spec_from_file_location
 import json
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
 
-import validate
+validator_path = Path(__file__).with_name("validate.py")
+spec = spec_from_file_location("scop_pr_source_summary_validator", validator_path)
+if spec is None or spec.loader is None:
+    raise ImportError(f"Cannot load validator from {validator_path}")
+validator = module_from_spec(spec)
+spec.loader.exec_module(validator)
 
 
 DIRECTORY = Path(__file__).parent
@@ -30,12 +36,12 @@ class EvidenceTests(unittest.TestCase):
 
     def verify_excerpt(self, excerpt):
         self.diff["excerpt"] = excerpt
-        identity, sources = validate.validate(self.record)
+        identity, sources = validator.validate(self.record)
         metadata = {"html_url": self.record["pr_url"], "merged": True,
                     "body": self.record["verified_facts"][2]["sources"][0]["excerpt"]}
         files = [{"filename": self.diff["locator"], "patch": PATCH}]
-        with patch.object(validate, "github_json", side_effect=[metadata, files]):
-            validate.verify_live(identity, sources)
+        with patch.object(validator, "github_json", side_effect=[metadata, files]):
+            validator.verify_live(identity, sources)
 
     def test_missing_diff_prefix(self):
         for excerpt in ("select_jinja_autoescape", self.diff["excerpt"].split("\n")[1][1:]):
@@ -57,7 +63,7 @@ class EvidenceTests(unittest.TestCase):
             self.verify_excerpt("+++ b/src/flask/sansio/app.py")
 
     def test_excerpt_cannot_span_hunks(self):
-        self.assertFalse(validate.diff_excerpt_matches(
+        self.assertFalse(validator.diff_excerpt_matches(
             "@@ -1 +1 @@\n-a\n+b\n@@ -3 +3 @@\n-c\n+d", "+b\n-c"
         ))
 
@@ -67,8 +73,8 @@ class EvidenceTests(unittest.TestCase):
 
     def test_complete_line_after_no_newline_marker(self):
         diff = "@@ -1 +1 @@\n-old\n\\ No newline at end of file\n+new"
-        self.assertTrue(validate.diff_excerpt_matches(diff, "+new"))
-        self.assertFalse(validate.diff_excerpt_matches(diff, "-old\n+new"))
+        self.assertTrue(validator.diff_excerpt_matches(diff, "+new"))
+        self.assertFalse(validator.diff_excerpt_matches(diff, "-old\n+new"))
 
     def test_incorrect_source_references(self):
         valid_url = self.diff["url"]
@@ -77,7 +83,7 @@ class EvidenceTests(unittest.TestCase):
             with self.subTest(url=url):
                 self.diff["url"] = url
                 with self.assertRaisesRegex(ValueError, "source URL does not match"):
-                    validate.validate(self.record)
+                    validator.validate(self.record)
 
     def test_missing_required_fields(self):
         for field in self.record:
@@ -85,13 +91,13 @@ class EvidenceTests(unittest.TestCase):
                 incomplete = self.record.copy()
                 del incomplete[field]
                 with self.assertRaisesRegex(ValueError, "missing record fields"):
-                    validate.validate(incomplete)
+                    validator.validate(incomplete)
         for field in self.diff:
             with self.subTest(source_field=field):
                 incomplete = copy.deepcopy(self.record)
                 del incomplete["verified_facts"][1]["sources"][0][field]
                 with self.assertRaisesRegex(ValueError, "invalid source fields"):
-                    validate.validate(incomplete)
+                    validator.validate(incomplete)
 
 
 class SuiteTests(unittest.TestCase):
@@ -101,7 +107,7 @@ class SuiteTests(unittest.TestCase):
     def run_validator(self, paths):
         output = io.StringIO()
         with patch("sys.argv", ["validate.py", *map(str, paths)]), contextlib.redirect_stdout(output):
-            status = validate.main()
+            status = validator.main()
         return status, output.getvalue()
 
     def assert_rejected(self, paths, message):
