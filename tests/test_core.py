@@ -68,7 +68,7 @@ class CoreTests(unittest.TestCase):
         folder = self.skills / "eof"
         folder.mkdir()
         (folder / "SKILL.md").write_text(
-            "---\\nname: eof-skill\\ndescription: Valid at EOF\\n---",
+            "---\nname: eof-skill\ndescription: Valid at EOF\n---",
             encoding="utf-8",
         )
         found = discover(self.skills)
@@ -76,7 +76,7 @@ class CoreTests(unittest.TestCase):
 
     def test_symlink_root_rejected(self):
         self.add("ok", "skill-one", "description")
-        # Keep the link inside this test\'s own temporary directory.
+        # Keep the link inside this test's own temporary directory.
         linked_root = self.skills / "linked-root"
         try:
             linked_root.symlink_to(self.skills, target_is_directory=True)
