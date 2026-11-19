@@ -20,9 +20,11 @@ class Skill:
 def _frontmatter(text: str) -> dict[str, str]:
     if not text.startswith("---\n"):
         raise ValueError("missing YAML frontmatter")
-    header, separator, _body = text[4:].partition("\n---\n")
-    if not separator:
+    # Closing delimiter is a complete line, including when it ends at EOF.
+    match = re.search(r"(?m)^---(?:\n|$)", text[4:])
+    if match is None:
         raise ValueError("unterminated frontmatter")
+    header = text[4:4 + match.start()]
     fields: dict[str, str] = {}
     for line in header.splitlines():
         if not line.strip():
