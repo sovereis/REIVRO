@@ -42,3 +42,7 @@ No approved Claude Workspace design or official MVP PRD was available in the che
 python -m pytest -q
 SCOP_LIVE_TESTS=1 python -m pytest -q
 ```
+
+## Local web client (v0.8)
+
+[Functional Workspace](WEB.md) now provides a loopback-only browser interface for this unchanged contract and optional v0.7 measurement recording. The earlier design-dependency note describes the v0.6 delivery context. The user subsequently clarified that conceptual vision and requirements are available, with no finalized visual design; v0.8 implements a minimal interface on that basis.
