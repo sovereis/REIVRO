@@ -23,3 +23,9 @@ jobs:
         run: python -m pip install pytest==8.4.2
       - name: Run complete suite
         run: python -m pytest -q
+      - name: Install browser test dependencies
+        run: |
+          npm ci --ignore-scripts --prefix tests/ui
+          tests/ui/node_modules/.bin/playwright install --with-deps chromium
+      - name: Run Workspace browser tests (offline evidence fixtures)
+        run: node --test tests/ui/workspace.test.cjs
