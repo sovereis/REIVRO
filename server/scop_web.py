@@ -92,6 +92,7 @@ class Handler(BaseHTTPRequestHandler):
         raw = (WEB / name).read_bytes()
         if name == 'index.html':
             raw = raw.replace(b'__TOKEN__', self.server.token.encode())
+            raw = raw.replace(b'__MEASUREMENTS__', b'configured' if self.server.store else b'unavailable')
         self.reply(200, raw, mime)
 
     def do_POST(self):

@@ -1,6 +1,31 @@
 'use strict';
 const $ = id => document.getElementById(id);
 let executionId = null;
+const urlInput = $('pr-url');
+const storeConfigured = $('store-help').dataset.availability === 'configured';
+if (storeConfigured) {
+  $('record-consent').disabled = false;
+  $('load-measurements').disabled = false;
+  $('store-help').textContent = 'Optional. Recording saves status, duration and citation counts in your private local store.';
+} else {
+  $('measurements').textContent = 'No measurement store is configured.';
+}
+
+// Mirror the Workspace URL shape for early feedback. Workspace still validates every request.
+function isCanonicalPRUrl(value) {
+  const match = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/[1-9][0-9]*$/.exec(value);
+  return value.length <= 300 && match?.[0] === value &&
+    !match.slice(1).some(part => part === '.' || part === '..');
+}
+
+urlInput.addEventListener('input', () => {
+  urlInput.removeAttribute('aria-invalid');
+  $('url-error').textContent = '';
+});
+
+function elapsed(milliseconds) {
+  return milliseconds >= 1000 ? `${(milliseconds / 1000).toFixed(2)} s` : `${milliseconds.toFixed(1)} ms`;
+}
 function element(tag, text, parent) {
   const node = document.createElement(tag);
   if (text !== undefined) node.textContent = text;
@@ -23,13 +48,15 @@ async function api(route, payload) {
 }
 function citation(source, parent) {
   const box = element('div', undefined, parent);
+  const label = {metadata: 'PR metadata', description: 'Author description', diff: 'Changed file'}[source.kind] ?? 'GitHub source';
   try {
     const url = new URL(source.url);
     if (url.protocol === 'https:' && ['github.com','api.github.com'].includes(url.hostname) && !url.username && !url.password) {
-      const link = element('a', `${source.kind}: ${source.locator}`, box);
+      const link = element('a', `${label}: ${source.locator} (opens GitHub in a new tab)`, box);
       link.href = url.href; link.target = '_blank'; link.rel = 'noopener noreferrer';
     } else element('span', 'Unsupported citation URL', box);
   } catch { element('span', 'Invalid citation URL', box); }
+  element('p', 'Exact source excerpt', box).className = 'hint excerpt-label';
   element('pre', source.excerpt, box);
 }
 function render(result) {
@@ -38,39 +65,52 @@ function render(result) {
   const run = workspace.execution;
   if (!run) throw new Error('No execution record was returned.');
   const panel = $('result'); panel.replaceChildren(); panel.hidden = false;
-  $('status').textContent = `Workflow ${run.status} · ${run.duration_ms} ms`;
+  $('status').textContent = `Workflow ${run.status} · ${elapsed(run.duration_ms)}`;
   element('h2', `Workflow ${run.status}`, panel);
   element('p', `Execution ${run.execution_id}`, panel);
   element('p', `Selected skill: ${run.skill ?? 'Not selected'}`, panel);
   element('p', `Evidence: ${run.references_verified} / ${run.references_checked} references matched`, panel);
-  const steps = element('ol', undefined, panel);
-  Object.values(run.steps).forEach(step => element('li', `${step.name.replaceAll('_',' ')} — ${step.status} · ${step.duration_ms === null ? 'Not started' : step.duration_ms + ' ms'}`, steps));
+  const details = element('details', undefined, panel);
+  element('summary', 'Workflow steps and timing', details);
+  const steps = element('ol', undefined, details);
+  Object.values(run.steps).forEach(step => element('li', `${step.name.replaceAll('_',' ')} — ${step.status} · ${step.duration_ms === null ? 'Not started' : elapsed(step.duration_ms)}`, steps));
   if (run.error_code) element('p', `${run.error_code}: ${run.error_message}`, panel);
   if (run.status === 'completed' && run.summary) {
     element('h2', 'Pull request summary', panel);
+    element('p', 'SCOP matched the excerpts to GitHub. Review whether each excerpt supports the claim in context.', panel);
     for (const fact of run.summary.verified_facts) {
       const article = element('article', undefined, panel);
-      element('p', fact.claim, article);
-      fact.sources.forEach(source => citation(source, article));
+      article.className = 'claim';
+      element('p', fact.claim, article).className = 'claim-text';
+      const sources = element('details', undefined, article);
+      element('summary', `Sources and excerpts (${fact.sources.length})`, sources);
+      fact.sources.forEach(source => citation(source, sources));
     }
     list('Assumptions', run.summary.assumptions, panel);
-    list('Summary limitations', run.summary.limitations, panel);
   }
-  list('Execution limitations', run.limitations, panel);
+  list('Limitations', [...new Set([...run.limitations, ...(run.summary?.limitations ?? [])])], panel);
   executionId = result.measurement && run.status === 'completed' ? run.execution_id : null;
   $('feedback-panel').hidden = !executionId;
   if (!result.measurement) element('p', 'This execution was not recorded. Feedback storage is unavailable for this run.', panel);
 }
 $('run-form').addEventListener('submit', async event => {
   event.preventDefault();
+  const prUrl = urlInput.value.trim();
+  if (!isCanonicalPRUrl(prUrl)) {
+    urlInput.setAttribute('aria-invalid', 'true');
+    $('url-error').textContent = 'Enter a GitHub pull request URL like https://github.com/pallets/flask/pull/5808. Remove any extra path, query, or fragment.';
+    urlInput.focus();
+    return;
+  }
+  const record = storeConfigured && $('record-consent').checked;
   $('run-button').disabled = true; $('result').hidden = true; $('feedback-panel').hidden = true;
   executionId = null; $('feedback-form').querySelector('button').disabled = false; $('feedback-form').reset(); $('feedback-status').textContent = '';
   $('status').textContent = 'Running the workflow… Waiting for the final execution record. Closing this page does not cancel execution.';
   try {
-    render(await api('/api/run', {request:{pr_url:$('pr-url').value.trim(),
+    render(await api('/api/run', {request:{pr_url:prUrl,
       permissions:$('github-consent').checked ? ['github:read-pr-evidence'] : []},
-      record_measurement:$('record-consent').checked,
-      permissions:$('record-consent').checked ? ['local:write-measurements'] : []}));
+      record_measurement:record,
+      permissions:record ? ['local:write-measurements'] : []}));
   } catch (error) { $('status').textContent = `Request error: ${error.message} No successful outcome is assumed.`; }
   finally { $('run-button').disabled = false; }
 });
