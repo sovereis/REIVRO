@@ -1,6 +1,7 @@
 import io
 import json
 from pathlib import Path
+import runpy
 import subprocess
 import sys
 import tempfile
@@ -33,7 +34,6 @@ class RuntimeTests(unittest.TestCase):
         for task, skill in (
             ("propose regression tests for a software bug", "bug-regression-test"),
             ("unrelated bananas", None),
-            ("a bug PR", "bug-regression-test"),
         ):
             with self.subTest(task=task):
                 result = run(TaskRequest(task), source)
@@ -42,8 +42,23 @@ class RuntimeTests(unittest.TestCase):
                 self.assertEqual(result.error.code, "no_adapter")
         source.read.assert_not_called()
 
+    def test_tied_skills_do_not_select_or_dispatch_an_adapter(self):
+        source = Mock()
+        with patch("server.scop_runtime.runpy.run_path") as load:
+            result = run(TaskRequest("a bug PR"), source)
+        self.assertEqual(result.status, Status.BLOCKED)
+        self.assertEqual(result.error.code, "ambiguous_skill")
+        self.assertIsNone(result.skill)
+        self.assertIsNone(result.validator)
+        self.assertEqual([e.status for e in result.logs], [Status.QUEUED, Status.BLOCKED])
+        source.read.assert_not_called()
+        load.assert_not_called()
+
     def test_malformed_or_oversized_input_fails(self):
-        for raw in (b"not-json", b"\xff", b"{}", b" " * (MAX_RECORD_BYTES + 1)):
+        for raw in (
+            b"", b"not-json", b"\xff", b"{}", b" " * (MAX_RECORD_BYTES + 1),
+            b"[" * 2000 + b"]" * 2000, b'{"x": NaN}', b'{"x": 1, "x": 2}',
+        ):
             with self.subTest(size=len(raw)):
                 result = run(TaskRequest(TASK), io.BytesIO(raw))
                 self.assertEqual(result.status, Status.FAILED)
@@ -76,13 +91,29 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(result.error.code, "read_failed")
         self.assertNotIn("private diagnostic", result.error.message)
 
+    def test_unexpected_execution_failure_hides_diagnostics(self):
+        for error in (RuntimeError("internal secret"), ValueError("internal secret")):
+            with self.subTest(error=type(error)):
+                with patch("server.scop_runtime.runpy.run_path", side_effect=error):
+                    result = run(TaskRequest(TASK), io.BytesIO(FIXTURE.read_bytes()))
+                self.assertEqual(result.status, Status.FAILED)
+                self.assertEqual(result.error.code, "execution_failed")
+                self.assertNotIn("internal secret", result.error.message)
+                self.assertEqual([e.status for e in result.logs], [Status.QUEUED, Status.RUNNING, Status.FAILED])
+                self.assertIsNone(result.validator)
+                self.assertIsNone(result.audit)
+                self.assertFalse(result.evidence_references)
+
     def test_audit_uses_no_process_or_network(self):
         record = json.loads(FIXTURE.read_bytes())
-        record["executor"] = "untrusted executor name"
+        record.update(executor="untrusted executor name", module="untrusted.module",
+                      path="../untrusted.py", command=["untrusted", "--live"])
         raw = json.dumps(record).encode()
         with patch("socket.socket", side_effect=AssertionError("network access")) as network:
             with patch("subprocess.Popen", side_effect=AssertionError("process launch")) as process:
-                result = run(TaskRequest(TASK), io.BytesIO(raw))
+                with patch("server.scop_runtime.runpy.run_path", wraps=runpy.run_path) as load:
+                    result = run(TaskRequest(TASK), io.BytesIO(raw))
+        load.assert_called_once_with(str(FIXTURE.with_name("validate.py")))
         self.assertEqual(result.status, Status.COMPLETED)
         network.assert_not_called()
         process.assert_not_called()
@@ -99,6 +130,8 @@ class RuntimeTests(unittest.TestCase):
             payload = json.loads(ok.stdout)
             self.assertEqual(payload["status"], "completed")
             self.assertEqual(payload["skill"], "pr-source-summary")
+            self.assertEqual(payload["validator"], "tests/pr-source-summary/validate.py::validate")
+            self.assertEqual(payload["validation_mode"], "offline_structure")
             self.assertEqual(payload["audit"], {
                 "pr_url": record["pr_url"], "claims_checked": 3, "references_checked": 3,
             })
@@ -113,11 +146,15 @@ class RuntimeTests(unittest.TestCase):
             self.assertIsNone(payload["error"])
             self.assertTrue(payload["limitations"])
 
-            record["verified_facts"][0]["sources"][0]["url"] += "/incorrect"
+            record["verified_facts"][1]["sources"][0]["locator"] = "private diagnostic marker"
             bad = subprocess.run(cmd, input=json.dumps(record).encode(), capture_output=True,
                                  cwd=directory, env=env, timeout=10)
             self.assertEqual(bad.returncode, 1, bad.stderr.decode())
             payload = json.loads(bad.stdout)
             self.assertEqual(payload["error"]["code"], "invalid_input")
             self.assertIn("source URL does not match", payload["error"]["message"])
+            self.assertNotIn("private diagnostic marker", bad.stdout.decode())
+            self.assertEqual(payload["validation_mode"], "offline_structure")
+            self.assertEqual(payload["status"], "failed")
+            self.assertIsNone(payload["audit"])
             self.assertEqual(list(Path(directory).iterdir()), [])

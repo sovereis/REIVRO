@@ -11,7 +11,7 @@ python -B -m server.scop_runtime "audit a GitHub pull request summary" \
   < tests/pr-source-summary/pallets-flask-5808.json
 ```
 
-The example returns `completed`, the PR URL, three claims, three references, time in milliseconds, and the three source references. Those counts describe the record's coverage. They do not measure time saved or establish the truth of the claims.
+The example returns `completed`, the PR URL, three claims, three references, time in milliseconds, and the three source references. When validation starts, the result records `tests/pr-source-summary/validate.py::validate` and `validation_mode: offline_structure`. Both fields are null when the validator is never invoked. Those counts describe the record's coverage. They do not measure time saved or establish the truth of the claims.
 
 The CLI reads one UTF-8 JSON object of up to 256,000 bytes on stdin and writes one JSON result on stdout. `-B` prevents Python bytecode writes. The optional repeatable `--permission` flag replaces the default grant. Only `local:read-summary-record` is supported. No repository write, GitHub access, model call, or subprocess is part of the audit.
 
@@ -22,7 +22,7 @@ The CLI reads one UTF-8 JSON object of up to 256,000 bytes on stdin and writes o
 | `blocked` | 2 | Permission denied, no supported unambiguous match, or the supplied record reports a blocker. |
 | `cancelled` | 130 | An interrupt was caught while processing the task. |
 
-Argument parsing errors are reported separately by the CLI on stderr. Task results record `queued` on receipt and `running` when the adapter begins. The final log entry records the terminal state and elapsed time. This is a synchronous process with in-memory logs and no persistent queue.
+Argument parsing errors are reported separately by the CLI on stderr. Task results record `queued` on receipt and `running` when the adapter begins. The final log entry records the terminal state and elapsed time. This is a synchronous process with in-memory logs and no persistent queue. Input bytes and task length are capped. The runtime has no wall-clock timeout and may wait for stdin to close.
 
 ## Execution boundary
 
