@@ -35,3 +35,7 @@ HTTP tests additionally cover malformed/oversized/invalid-encoding input, cross-
 ## Limits
 
 This evidence supports a local functional MVP only. No multi-user deployment, hard cancellation, streaming progress, durable summary history, idempotent retries, semantic-verification guarantee, or measured productivity gains are claimed. Browser checks are Chromium-based, not a full assistive-technology or cross-browser audit. GitHub API availability/rate limits remain external dependencies. Hosted CI status is reported in the PR and delivery report after the push.
+
+## Hosted CI runner correction
+
+The first hosted run passed Python (87 passed, 5 skipped) but browser installation failed: `ubuntu-latest` resolved to Ubuntu 26.04, unsupported by pinned Playwright 1.58.2. The workflow now pins `ubuntu-24.04`, a supported runner, rather than weakening or skipping browser checks. The final hosted result is linked in the PR delivery report.
