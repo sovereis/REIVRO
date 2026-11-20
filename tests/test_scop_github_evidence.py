@@ -91,7 +91,8 @@ class GithubEvidenceTests(unittest.TestCase):
         def missing(url, deadline):
             if "/files?" not in url:
                 return github_response(url, deadline)
-            return [{"filename": f"unrelated-{i}.py"} for i in range(100)]
+            page = url.rsplit("=", 1)[1]
+            return [{"filename": f"unrelated-{page}-{i}.py"} for i in range(100)]
         with patch("server.scop_github_evidence.fetch_json", side_effect=missing) as fetch:
             result = run_live(TASK, io.BytesIO(FIXTURE.read_bytes()), (GITHUB_READ,))
         self.assertEqual(result.status, Status.BLOCKED)

@@ -102,34 +102,46 @@ def fetch_json(url: str, deadline: float):
         raise _Unavailable("GitHub returned invalid evidence data") from exc
 
 
-def _check_sources(record: dict, identity: tuple[str, str, str], sources: list[dict],
-                   outcome: LiveResult) -> None:
-    """Verify citations without letting input select arbitrary network targets."""
+def _fetch_metadata(pr_url: str, identity: tuple[str, str, str], deadline: float):
     owner, repository, number = identity
     endpoint = f"https://api.github.com/repos/{owner}/{repository}/pulls/{number}"
-    deadline = monotonic() + _NETWORK_BUDGET_SECONDS
     metadata = fetch_json(endpoint, deadline)
-    if not isinstance(metadata, dict) or metadata.get("html_url") != record["pr_url"]:
+    if not isinstance(metadata, dict) or metadata.get("html_url") != pr_url:
         raise _Unavailable("GitHub returned an unexpected PR identity")
+    return endpoint, metadata
 
+
+def _fetch_files(endpoint: str, deadline: float, paths: set[str] | None = None) -> dict:
+    files = {}
+    for page in range(1, _MAX_FILE_PAGES + 1):
+        data = fetch_json(f"{endpoint}/files?per_page=100&page={page}", deadline)
+        if not isinstance(data, list) or len(data) > 100:
+            raise _Unavailable("GitHub returned an unexpected file list")
+        for item in data:
+            filename = item.get("filename") if isinstance(item, dict) else None
+            if not isinstance(filename, str):
+                raise _Unavailable("GitHub returned an unexpected file entry")
+            if filename in files:
+                raise _Unavailable("GitHub returned a duplicate file entry")
+            files[filename] = item
+        if (paths is not None and paths <= files.keys()) or len(data) < 100:
+            break
+    if paths is not None and not paths <= files.keys():
+        raise _Unavailable("Not all cited files were available within the fetch limit")
+    return files
+
+
+def _check_sources(record: dict, identity: tuple[str, str, str], sources: list[dict],
+                   outcome: LiveResult) -> None:
+    deadline = monotonic() + _NETWORK_BUDGET_SECONDS
+    endpoint, metadata = _fetch_metadata(record["pr_url"], identity, deadline)
     paths = {s["locator"] for s in sources if s["kind"] == "diff"}
-    patches = {}
-    if paths:
-        for page in range(1, _MAX_FILE_PAGES + 1):
-            data = fetch_json(f"{endpoint}/files?per_page=100&page={page}", deadline)
-            if not isinstance(data, list) or len(data) > 100:
-                raise _Unavailable("GitHub returned an unexpected file list")
-            for item in data:
-                filename = item.get("filename") if isinstance(item, dict) else None
-                if not isinstance(filename, str):
-                    raise _Unavailable("GitHub returned an unexpected file entry")
-                if filename in paths:
-                    patches[filename] = item.get("patch")
-            if paths <= patches.keys() or len(data) < 100:
-                break
-        if not paths <= patches.keys():
-            raise _Unavailable("Not all cited files were available within the fetch limit")
+    files = _fetch_files(endpoint, deadline, paths) if paths else {}
+    _compare_sources(metadata, files, sources, outcome)
 
+
+def _compare_sources(metadata: dict, files: dict, sources: list[dict],
+                     outcome: LiveResult) -> None:
     # Reuse the trusted existing hunk-matching implementation, without changing it.
     diff_match = runpy.run_path(str(_VALIDATOR_PATH))["diff_excerpt_matches"]
     for citation in sources:
@@ -137,7 +149,7 @@ def _check_sources(record: dict, identity: tuple[str, str, str], sources: list[d
         locator = citation["locator"]
         excerpt = citation["excerpt"]
         if kind == "diff":
-            patch = patches.get(locator)
+            patch = files.get(locator, {}).get("patch")
             if not isinstance(patch, str):
                 raise _Unavailable("A cited diff patch was unavailable")
             correct = diff_match(patch, excerpt)
