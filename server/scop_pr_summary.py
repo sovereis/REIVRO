@@ -141,6 +141,42 @@ def _build_record(url: str, metadata: dict, files: dict) -> dict:
     }
 
 
+@dataclass(frozen=True)
+class _Draft:
+    record: dict
+    metadata: dict
+    files: dict
+
+
+def _parse_identity(pr_url: str, schema: dict) -> tuple[str, str, str] | None:
+    match = schema["PR_URL"].fullmatch(pr_url) if isinstance(pr_url, str) and len(pr_url) <= 300 else None
+    if match and not any(part in {".", ".."} for part in match.groups()[:2]):
+        return match.groups()
+    return None
+
+
+def _generate_draft(pr_url: str, identity: tuple[str, str, str]) -> _Draft:
+    deadline = monotonic() + _NETWORK_BUDGET_SECONDS
+    endpoint, metadata = _fetch_metadata(pr_url, identity, deadline)
+    changed_files = metadata.get("changed_files")
+    if type(changed_files) is not int or not 0 < changed_files <= _MAX_FILE_PAGES * 100:
+        raise _Unavailable("PR file count is missing, empty, or outside the fetch limit")
+    files = _fetch_files(endpoint, deadline)
+    if len(files) != changed_files:
+        raise _Unavailable("GitHub returned an incomplete file list")
+    return _Draft(_build_record(pr_url, metadata, files), metadata, files)
+
+
+def _verify_draft(draft: _Draft, schema: dict, outcome: SummaryResult) -> None:
+    _, sources = schema["validate"](draft.record)
+    outcome.offline_validation = "offline_structure"
+    _compare_sources(draft.metadata, draft.files, sources, outcome)
+    outcome.evidence_references = tuple(
+        EvidenceReference(ref["kind"], ref["url"], ref["locator"]) for ref in sources
+    )
+    outcome.summary = draft.record
+
+
 def summarize(pr_url: str, permissions: tuple[str, ...] = ()) -> SummaryResult:
     started = monotonic()
     outcome = SummaryResult()
@@ -160,27 +196,12 @@ def summarize(pr_url: str, permissions: tuple[str, ...] = ()) -> SummaryResult:
         return stop(Status.BLOCKED, "permission_denied", "Explicit github:read-pr-evidence permission is required")
     try:
         schema = runpy.run_path(str(_VALIDATOR_PATH))
-        identity = schema["PR_URL"].fullmatch(pr_url) if isinstance(pr_url, str) and len(pr_url) <= 300 else None
-        if not identity or any(part in {".", ".."} for part in identity.groups()[:2]):
+        identity = _parse_identity(pr_url, schema)
+        if identity is None:
             return stop(Status.FAILED, "invalid_pr_url", "Expected a canonical public GitHub PR URL")
         outcome.pr_url = pr_url
         event(Status.RUNNING, "Fetching public GitHub evidence")
-        deadline = monotonic() + _NETWORK_BUDGET_SECONDS
-        endpoint, metadata = _fetch_metadata(pr_url, identity.groups(), deadline)
-        changed_files = metadata.get("changed_files")
-        if type(changed_files) is not int or not 0 < changed_files <= _MAX_FILE_PAGES * 100:
-            raise _Unavailable("PR file count is missing, empty, or outside the fetch limit")
-        files = _fetch_files(endpoint, deadline)
-        if len(files) != changed_files:
-            raise _Unavailable("GitHub returned an incomplete file list")
-        record = _build_record(pr_url, metadata, files)
-        _, sources = schema["validate"](record)
-        outcome.offline_validation = "offline_structure"
-        _compare_sources(metadata, files, sources, outcome)
-        outcome.evidence_references = tuple(
-            EvidenceReference(ref["kind"], ref["url"], ref["locator"]) for ref in sources
-        )
-        outcome.summary = record
+        _verify_draft(_generate_draft(pr_url, identity), schema, outcome)
     except KeyboardInterrupt:
         return stop(Status.CANCELLED, "interrupted", "PR summary generation interrupted")
     except _Unavailable as exc:
