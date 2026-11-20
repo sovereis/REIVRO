@@ -5,13 +5,14 @@ It checks that each cited excerpt appears in the current GitHub PR evidence.
 """
 import argparse
 from dataclasses import asdict, dataclass, field
+from http.client import HTTPException
 import io
 import json
 from pathlib import Path
+import re
 import runpy
 import sys
 from time import monotonic
-from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .scop_runtime import (
@@ -22,6 +23,11 @@ GITHUB_READ = "github:read-pr-evidence"
 _MAX_RESPONSE_BYTES = 2_000_000
 _MAX_FILE_PAGES = 3
 _TIMEOUT_SECONDS = 10
+_NETWORK_BUDGET_SECONDS = 30
+_ENDPOINT = re.compile(
+    r"https://api\.github\.com/repos/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+"
+    r"/pulls/[1-9][0-9]*(?:/files\?per_page=100&page=[1-3])?"
+)
 _ROOT = Path(__file__).resolve().parents[1]
 _VALIDATOR_PATH = _ROOT / "tests" / "pr-source-summary" / "validate.py"
 
@@ -59,33 +65,50 @@ class _NoRedirect(HTTPRedirectHandler):
         return None
 
 
-def fetch_json(url: str):
-    """Fetch bounded JSON only from the fixed GitHub API origin."""
-    if not url.startswith("https://api.github.com/repos/"):
+def _remaining(deadline: float) -> float:
+    remaining = deadline - monotonic()
+    if remaining <= 0:
+        raise _Unavailable("GitHub evidence exceeded the network time budget")
+    return remaining
+
+
+def fetch_json(url: str, deadline: float):
+    """Fetch bounded JSON from a fixed GitHub API endpoint."""
+    if not _ENDPOINT.fullmatch(url):
         raise _Unavailable("unsupported evidence endpoint")
     request = Request(url, headers={
         "Accept": "application/vnd.github+json",
         "User-Agent": "SCOP-github-evidence-v0.3",
-    })
+    }, method="GET")
     opener = build_opener(_NoRedirect)
+    raw = bytearray()
     try:
-        with opener.open(request, timeout=_TIMEOUT_SECONDS) as response:
-            raw = response.read(_MAX_RESPONSE_BYTES + 1)
-    except (HTTPError, URLError, OSError, TimeoutError) as exc:
+        timeout = min(_TIMEOUT_SECONDS, _remaining(deadline))
+        with opener.open(request, timeout=timeout) as response:
+            while True:
+                _remaining(deadline)
+                chunk = response.read1(min(65_536, _MAX_RESPONSE_BYTES + 1 - len(raw)))
+                _remaining(deadline)
+                if not chunk:
+                    break
+                raw.extend(chunk)
+                if len(raw) > _MAX_RESPONSE_BYTES:
+                    raise _Unavailable("GitHub response exceeds the evidence limit")
+    except (OSError, HTTPException) as exc:
         raise _Unavailable("GitHub evidence could not be retrieved") from exc
-    if len(raw) > _MAX_RESPONSE_BYTES:
-        raise _Unavailable("GitHub response exceeds the evidence limit")
     try:
         return json.loads(raw)
-    except (ValueError, UnicodeError) as exc:
+    except (ValueError, RecursionError) as exc:
         raise _Unavailable("GitHub returned invalid evidence data") from exc
 
 
-def _check_sources(record: dict, identity: tuple[str, str, str], sources: list[dict]) -> int:
+def _check_sources(record: dict, identity: tuple[str, str, str], sources: list[dict],
+                   outcome: LiveResult) -> None:
     """Verify citations without letting input select arbitrary network targets."""
     owner, repository, number = identity
     endpoint = f"https://api.github.com/repos/{owner}/{repository}/pulls/{number}"
-    metadata = fetch_json(endpoint)
+    deadline = monotonic() + _NETWORK_BUDGET_SECONDS
+    metadata = fetch_json(endpoint, deadline)
     if not isinstance(metadata, dict) or metadata.get("html_url") != record["pr_url"]:
         raise _Unavailable("GitHub returned an unexpected PR identity")
 
@@ -93,12 +116,15 @@ def _check_sources(record: dict, identity: tuple[str, str, str], sources: list[d
     patches = {}
     if paths:
         for page in range(1, _MAX_FILE_PAGES + 1):
-            data = fetch_json(f"{endpoint}/files?per_page=100&page={page}")
-            if not isinstance(data, list):
+            data = fetch_json(f"{endpoint}/files?per_page=100&page={page}", deadline)
+            if not isinstance(data, list) or len(data) > 100:
                 raise _Unavailable("GitHub returned an unexpected file list")
             for item in data:
-                if isinstance(item, dict) and item.get("filename") in paths:
-                    patches[item["filename"]] = item.get("patch")
+                filename = item.get("filename") if isinstance(item, dict) else None
+                if not isinstance(filename, str):
+                    raise _Unavailable("GitHub returned an unexpected file entry")
+                if filename in paths:
+                    patches[filename] = item.get("patch")
             if paths <= patches.keys() or len(data) < 100:
                 break
         if not paths <= patches.keys():
@@ -106,7 +132,6 @@ def _check_sources(record: dict, identity: tuple[str, str, str], sources: list[d
 
     # Reuse the trusted existing hunk-matching implementation, without changing it.
     diff_match = runpy.run_path(str(_VALIDATOR_PATH))["diff_excerpt_matches"]
-    matched = 0
     for citation in sources:
         kind = citation["kind"]
         locator = citation["locator"]
@@ -126,10 +151,10 @@ def _check_sources(record: dict, identity: tuple[str, str, str], sources: list[d
             correct = isinstance(body, str) and excerpt in body
         else:
             raise _Mismatch("Unsupported citation type")
+        outcome.references_checked += 1
         if not correct:
             raise _Mismatch("A citation does not match the GitHub evidence")
-        matched += 1
-    return matched
+        outcome.references_verified += 1
 
 
 def run_live(task: str, source, permissions: tuple[str, ...] = ()) -> LiveResult:
@@ -160,14 +185,13 @@ def run_live(task: str, source, permissions: tuple[str, ...] = ()) -> LiveResult
             return stop(offline.status, offline.error.code if offline.error else "offline_failed",
                         "Offline record validation did not complete")
         outcome.pr_url = offline.audit.pr_url
-        outcome.references_checked = offline.audit.references_checked
         outcome.evidence_references = offline.evidence_references
         event(Status.RUNNING, "Offline structure passed; checking GitHub evidence")
         record = json.loads(raw)
         identity = runpy.run_path(str(_VALIDATOR_PATH))["PR_URL"].fullmatch(outcome.pr_url).groups()
         # The offline validator already checked the canonical PR URL and citations.
         sources = [citation for fact in record["verified_facts"] for citation in fact["sources"]]
-        outcome.references_verified = _check_sources(record, identity, sources)
+        _check_sources(record, identity, sources, outcome)
     except KeyboardInterrupt:
         return stop(Status.CANCELLED, "interrupted", "Evidence verification interrupted")
     except _Unavailable:
