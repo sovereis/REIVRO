@@ -1,8 +1,10 @@
-# Functional Workspace MVP v0.8
+# Functional Workspace
 
 A local web interface for the existing PR summary workflow and measurement contracts. The official MVP PRD informed the separation between technical completion and human acceptance, permissions, evidence, and missing metrics. There is no approved pixel-perfect design or implemented Claude frontend; this is a minimal functional interface, not a claim of design conformance or completion of every PRD requirement.
 
 ## Start
+
+For first-time setup on Windows with WSL or Linux, see the [quick start](../README.md).
 
 From the trusted checkout on Linux, using Python 3.12:
 

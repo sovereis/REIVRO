@@ -26,7 +26,7 @@ def build(url, metadata, files):
         result['verified_facts'][-1]['sources'][-1]['excerpt'] = '+not present'
     return result
 
-with tempfile.TemporaryDirectory(prefix='scop-ui-') as store, LocalServer(0, store) as server:
+with tempfile.TemporaryDirectory(prefix='scop-ui-') as store, LocalServer(0, None if os.getenv('SCOP_UI_NO_STORE') == '1' else store) as server:
     print(server.origin, flush=True)
     if os.getenv('SCOP_UI_LIVE') == '1':
         server.serve_forever()
