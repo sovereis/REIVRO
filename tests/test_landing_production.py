@@ -6,7 +6,7 @@ from landing.backend.storage import SupabaseStore
 from landing.build import build
 
 ENV = {'SCOP_PUBLIC_ORIGIN':'https://scop.example.com', 'SCOP_SUPABASE_URL':'https://testproject.supabase.co',
-       'SCOP_SUPABASE_SERVICE_ROLE_KEY':'test-key-' * 5, 'SCOP_SIGNUP_SECRET':'test-secret-' * 4}
+       'SCOP_SUPABASE_PUBLISHABLE_KEY':'test-key-' * 5, 'SCOP_SUPABASE_RPC_SECRET':'rpc-secret-' * 4, 'SCOP_SIGNUP_SECRET':'test-secret-' * 4}
 VALUE = {'email':'test@example.com', 'tool':'test tool', 'problem':'test challenge', 'consent':True}
 
 @pytest.fixture
@@ -29,7 +29,7 @@ def test_missing_configuration_never_dispatches(monkeypatch):
 def test_config_and_success(configured):
     code, result = process('GET', '/api/config', configured)
     assert code == 200 and result['available'] and result['token']
-    assert ENV['SCOP_SUPABASE_SERVICE_ROLE_KEY'] not in json.dumps(result)
+    assert ENV['SCOP_SUPABASE_PUBLISHABLE_KEY'] not in json.dumps(result)
     with patch('landing.backend.production.SupabaseStore') as store:
         assert process('POST', '/api/signup', configured, json.dumps(VALUE).encode()) == (201, {'saved':True})
         store.return_value.save.assert_called_once_with(VALUE)
@@ -65,17 +65,17 @@ def test_storage_failure_redacted(configured):
 
 def test_rest_adapter_verifies_acknowledgement():
     response = MagicMock()
-    response.status = 201
+    response.status = 200
     response.read.return_value = b'[{"id":"test-id"}]'
     opener = MagicMock()
     opener.open.return_value.__enter__.return_value = response
     with patch('landing.backend.storage.urllib.request.build_opener',return_value=opener), patch('landing.backend.storage.uuid4',return_value='test-id'):
-        store = SupabaseStore(ENV['SCOP_SUPABASE_URL'], ENV['SCOP_SUPABASE_SERVICE_ROLE_KEY'])
+        store = SupabaseStore(ENV['SCOP_SUPABASE_URL'], ENV['SCOP_SUPABASE_PUBLISHABLE_KEY'], ENV['SCOP_SUPABASE_RPC_SECRET'])
         store.save(VALUE)
         request = opener.open.call_args.args[0]
-        assert request.full_url.endswith('/rest/v1/scop_signups?select=id')
+        assert request.full_url.endswith('/rest/v1/rpc/scop_signup_insert')
         assert opener.open.call_args.kwargs['timeout'] == 8
-        assert json.loads(request.data)['consent'] is True
+        assert json.loads(request.data)['p_consent'] is True
         response.read.return_value = b'[]'
         with pytest.raises(ValueError):
             store.save(VALUE)
