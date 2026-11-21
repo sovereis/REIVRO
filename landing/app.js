@@ -2,9 +2,25 @@
 const form = document.getElementById('signup-form');
 const button = document.getElementById('submit');
 const status = document.getElementById('form-status');
-const available = form.dataset.available === 'true';
+let available = form.dataset.available === 'true';
+let signupToken = document.querySelector('meta[name="signup-token"]').content;
 button.disabled = !available;
 status.textContent = available ? '' : 'Signups are unavailable in this preview. The operator must configure a private signup directory.';
+if (form.dataset.available === '__AVAILABLE__') {
+  status.textContent = 'Checking signup availability…';
+  fetch('/api/config', {cache: 'no-store'})
+    .then(async response => {
+      const config = await response.json();
+      if (!response.ok || config.available !== true || typeof config.token !== 'string') throw new Error();
+      signupToken = config.token;
+      available = true;
+      button.disabled = false;
+      status.textContent = '';
+    })
+    .catch(() => {
+      status.textContent = 'Signups are unavailable. Please try again later.';
+    });
+}
 const fields = ['email', 'tool', 'problem', 'consent'];
 for (const name of fields) {
   document.getElementById(name).addEventListener('input', () => {
@@ -37,7 +53,7 @@ form.addEventListener('submit', async event => {
   try {
     const response = await fetch('/api/signup', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', 'X-SCOP-Token': document.querySelector('meta[name="signup-token"]').content},
+      headers: {'Content-Type': 'application/json', 'X-SCOP-Token': signupToken},
       body: JSON.stringify(payload)
     });
     const result = await response.json();

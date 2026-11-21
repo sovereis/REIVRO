@@ -7,33 +7,18 @@ import json
 from itertools import islice
 import os
 from pathlib import Path
-import re
 import secrets
 from uuid import uuid4
 
-from .scop_measurement import MeasurementError, _json, _open_store, _write
+from .scop_measurement import MeasurementError, _open_store, _write
+
+from landing.backend.validation import validate_signup
 
 ASSETS = Path(__file__).resolve().parents[1] / 'landing'
 MAX_BODY = 8192
 MAX_SIGNUPS = 10_000
 
 
-def validate_signup(raw):
-    value = _json(raw)
-    if not isinstance(value, dict) or set(value) != {'email', 'tool', 'problem', 'consent'}:
-        raise ValueError('Invalid fields')
-    for name, maximum in [('email', 254), ('tool', 120), ('problem', 2000)]:
-        text = value[name]
-        if (not isinstance(text, str) or not 1 <= len(text.strip()) <= maximum
-                or any(ord(char) < 32 and char not in '\n\t' for char in text)
-                or any(0xD800 <= ord(char) <= 0xDFFF for char in text)):
-            raise ValueError('Invalid text')
-        value[name] = text.strip()
-    if not re.fullmatch(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,63}", value['email']):
-        raise ValueError('Invalid email')
-    if value['consent'] is not True:
-        raise ValueError('Consent required')
-    return value
 
 
 def save_signup(directory, value):
