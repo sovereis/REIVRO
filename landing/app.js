@@ -57,14 +57,17 @@ const hero = document.querySelector('.hero');
 const art = document.querySelector('.hero-art');
 const depth = document.querySelector('.hero-depth');
 const content = document.querySelector('.hero-content');
+let pointerX = 0;
+let pointerY = 0;
+const pointerQuery = matchMedia('(hover: hover) and (pointer: fine)');
 let motionFrame = null;
 let heroHeight = hero.offsetHeight;
 function paintDepth() {
   motionFrame = null;
   if (!motionQuery.matches) return;
   const progress = Math.min(Math.max(window.scrollY / heroHeight, 0), 1);
-  depth.style.transform = `translate3d(0, ${progress * 15}px, -35px)`;
-  art.style.transform = `translate3d(0, ${progress * 40}px, 0) scale(${1 + progress * 0.025}) rotateX(${progress * 1.2}deg)`;
+  depth.style.transform = `translate3d(${-pointerX}px, ${progress * 15 - pointerY}px, -35px)`;
+  art.style.transform = `translate3d(${pointerX}px, ${progress * 28 + pointerY}px, 0) scale(${1 + progress * 0.025}) rotateX(${progress * 1.2}deg)`;
   content.style.transform = `translate3d(0, ${progress * -10}px, 15px)`;
 }
 function scheduleDepth() {
@@ -73,6 +76,8 @@ function scheduleDepth() {
 function resetMotion() {
   if (motionFrame !== null) cancelAnimationFrame(motionFrame);
   motionFrame = null;
+  pointerX = 0;
+  pointerY = 0;
   for (const layer of [depth, art, content]) layer.style.removeProperty('transform');
   heroHeight = hero.offsetHeight;
   scheduleDepth();
@@ -81,3 +86,15 @@ window.addEventListener('scroll', scheduleDepth, {passive:true});
 window.addEventListener('resize', resetMotion, {passive:true});
 motionQuery.addEventListener('change', resetMotion);
 scheduleDepth();
+
+hero.addEventListener('pointermove', event => {
+  if (!motionQuery.matches || !pointerQuery.matches || event.pointerType !== 'mouse') return;
+  pointerX = (event.clientX / window.innerWidth - 0.5) * 6;
+  pointerY = (event.clientY / window.innerHeight - 0.5) * 4;
+  scheduleDepth();
+}, {passive: true});
+hero.addEventListener('pointerleave', () => {
+  pointerX = 0;
+  pointerY = 0;
+  scheduleDepth();
+}, {passive: true});

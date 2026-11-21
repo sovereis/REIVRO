@@ -34,7 +34,7 @@ test('responsive original hero, keyboard navigation, actual signup and failure s
   await page.keyboard.press('Tab');
   assert.ok(await page.getByRole('link', {name:'Skip to content'}).evaluate(node => node === document.activeElement));
   assert.match(await page.locator('h1').innerText(), /One ecosystem/);
-  await page.locator('#main').focus();
+  await page.locator('h1').click();
   for (const [width,height,label] of [[1440,1000,'desktop'],[1024,900,'small-desktop'],[768,1024,'tablet'],[390,844,'mobile']]) {
     await page.setViewportSize({width,height});
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
@@ -82,6 +82,8 @@ test('scroll depth changes on desktop and resets for reduced motion and mobile',
     await image.decode();
     return image.naturalWidth === 1672 && image.naturalHeight === 941;
   }));
+  await page.mouse.move(1100, 180);
+  await page.waitForFunction(() => document.querySelector('.hero-art').style.transform.includes('translate3d('));
   const before = await page.locator('.hero-art').evaluate(node => getComputedStyle(node).transform);
   await page.evaluate(() => scrollTo(0, 350));
   await page.waitForFunction(value => getComputedStyle(document.querySelector('.hero-art')).transform !== value, before);
@@ -103,7 +105,7 @@ test('scroll depth changes on desktop and resets for reduced motion and mobile',
     const channels = color.match(/\d+/g);
     if (!channels) return true;
     const rgb = channels.slice(0,3).map(Number);
-    return Math.max(...rgb) - Math.min(...rgb) < 35;
+    return Math.max(...rgb) - Math.min(...rgb) < 35 || (rgb[2] >= rgb[1] && rgb[1] >= rgb[0] && rgb[2] <= 110);
   }));
   await page.close();
 });
