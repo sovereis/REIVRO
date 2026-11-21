@@ -1,4 +1,4 @@
 from backend.http import SignupHandler
 
 class handler(SignupHandler):
-    pass
+    endpoint_path = '/api/signup'
