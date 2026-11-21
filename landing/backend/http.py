@@ -35,7 +35,8 @@ class SignupHandler(BaseHTTPRequestHandler):
             body = self.rfile.read(int(length))
             if len(body) != int(length):
                 return self.respond(400, {'error':'Incomplete request'})
-        self.respond(*process(self.command, self.path, headers, body))
+        path = getattr(self, 'endpoint_path', self.path)
+        self.respond(*process(self.command, path, headers, body))
 
     do_GET = dispatch
     do_POST = dispatch
