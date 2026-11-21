@@ -33,9 +33,9 @@ class Preview(SignupHandler):
     do_POST = dispatch
 
 os.environ.update(SCOP_PUBLIC_ORIGIN='https://scop.example.com', SCOP_SUPABASE_URL='https://testproject.supabase.co',
-                  SCOP_SUPABASE_SERVICE_ROLE_KEY='test-key-'*5, SCOP_SIGNUP_SECRET='test-secret-'*4)
+                  SCOP_SUPABASE_PUBLISHABLE_KEY='test-key-'*5, SCOP_SUPABASE_RPC_SECRET='rpc-secret-'*4, SCOP_SIGNUP_SECRET='test-secret-'*4)
 if os.getenv('SCOP_NO_PRODUCTION_STORE'):
-    del os.environ['SCOP_SUPABASE_SERVICE_ROLE_KEY']
+    del os.environ['SCOP_SUPABASE_RPC_SECRET']
 with tempfile.TemporaryDirectory() as directory:
     build(directory)
     with HTTPServer(('127.0.0.1',0),Preview) as server:
