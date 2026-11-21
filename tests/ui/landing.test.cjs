@@ -1,0 +1,73 @@
+const {test, before, after} = require('node:test');
+const assert = require('node:assert/strict');
+const {spawn} = require('node:child_process');
+const path = require('node:path');
+const {chromium} = require('playwright');
+let browser;
+const servers = [];
+async function serve(disabled = false) {
+  const child = spawn(process.env.PYTHON || 'python', ['-B', '-m', 'tests.ui.serve_landing'], {
+    cwd: path.resolve(__dirname, '../..'),
+    env: {...process.env, ...(disabled ? {SCOP_NO_SIGNUPS:'1'} : {})}
+  });
+  servers.push(child);
+  return new Promise((resolve, reject) => {
+    child.stdout.once('data', data => resolve(data.toString().trim()));
+    child.once('error', reject);
+    child.once('exit', code => reject(new Error('Preview exited ' + code)));
+  });
+}
+before(async () => {
+  browser = await chromium.launch({headless:true, executablePath:process.env.SCOP_CHROMIUM || undefined});
+});
+after(async () => {
+  await browser?.close();
+  servers.forEach(child => child.kill());
+});
+
+test('responsive original hero, keyboard navigation, actual signup and failure state', async () => {
+  const origin = await serve();
+  const page = await browser.newPage();
+  const external = [];
+  page.on('request', request => { if (!request.url().startsWith(origin)) external.push(request.url()); });
+  await page.goto(origin);
+  await page.keyboard.press('Tab');
+  assert.ok(await page.getByRole('link', {name:'Skip to content'}).evaluate(node => node === document.activeElement));
+  assert.match(await page.locator('h1').innerText(), /One ecosystem/);
+  await page.locator('#main').focus();
+  for (const [width,height,label] of [[1440,1000,'desktop'],[768,1024,'tablet'],[390,844,'mobile']]) {
+    await page.setViewportSize({width,height});
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await page.screenshot({path:`/tmp/scop-landing-${label}.png`, fullPage:true});
+  }
+  assert.equal(external.length, 0);
+  await page.locator('#submit').click();
+  assert.match(await page.locator('#email-error').innerText(), /valid email/);
+  assert.ok(await page.locator('#email').evaluate(node => node === document.activeElement));
+  await page.locator('#email').fill('tester@example.com');
+  await page.locator('#tool').fill('Test tool');
+  await page.locator('#problem').fill('Reviewing generated code takes time.');
+  await page.locator('#submit').click();
+  assert.match(await page.locator('#consent-error').innerText(), /consent/);
+  await page.locator('#consent').check();
+  const saved = page.waitForResponse(response => response.url().endsWith('/api/signup'));
+  await page.locator('#submit').click();
+  assert.equal((await saved).status(), 201);
+  await page.getByText('Your interest has been saved. Thank you for helping shape SCOP.', {exact:true}).waitFor();
+  await page.locator('#email').fill('tester@example.com');
+  await page.locator('#tool').fill('Test tool');
+  await page.locator('#problem').fill('Another test response.');
+  await page.locator('#consent').check();
+  await page.route('**/api/signup', route => route.fulfill({status:503,contentType:'application/json',body:'{"error":"unavailable"}'}));
+  await page.locator('#submit').click();
+  await page.getByText(/We could not confirm your submission/).waitFor();
+  await page.close();
+});
+
+test('unconfigured signup storage disables collection honestly', async () => {
+  const page = await browser.newPage();
+  await page.goto(await serve(true));
+  assert.ok(await page.locator('#submit').isDisabled());
+  assert.match(await page.locator('#form-status').innerText(), /unavailable/);
+  await page.close();
+});
