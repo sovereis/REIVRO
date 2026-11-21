@@ -24,11 +24,12 @@ def configuration():
     url = os.getenv('SCOP_SUPABASE_URL', '')
     if not re.fullmatch(r'https://[a-z0-9-]+\.supabase\.co', url):
         raise ValueError('Invalid storage endpoint')
-    key = os.getenv('SCOP_SUPABASE_SERVICE_ROLE_KEY', '')
+    key = os.getenv('SCOP_SUPABASE_PUBLISHABLE_KEY', '')
+    rpc_secret = os.getenv('SCOP_SUPABASE_RPC_SECRET', '')
     secret = os.getenv('SCOP_SIGNUP_SECRET', '')
-    if len(key) < 20 or len(secret) < 32:
+    if len(key) < 20 or len(rpc_secret) < 32 or len(secret) < 32:
         raise ValueError('Missing server credentials')
-    return origin, url, key, secret
+    return origin, url, key, rpc_secret, secret
 
 
 def token(secret, origin):
@@ -51,7 +52,7 @@ def valid_token(value, secret, origin):
 
 def process(method, path, headers, body=b''):
     try:
-        origin, url, key, secret = configuration()
+        origin, url, key, rpc_secret, secret = configuration()
     except ValueError:
         return 503, {'error': 'Signups unavailable. Production storage is not configured.'}
     if (headers.get('host') != urlsplit(origin).netloc
@@ -73,7 +74,7 @@ def process(method, path, headers, body=b''):
     except (ValueError, RecursionError):
         return 400, {'error': 'Check the fields and consent'}
     try:
-        SupabaseStore(url, key).save(value)
+        SupabaseStore(url, key, rpc_secret).save(value)
     except Exception:
         return 503, {'error': 'Could not confirm storage. Please try again later.'}
     return 201, {'saved': True}
