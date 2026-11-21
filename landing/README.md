@@ -30,9 +30,9 @@ The hero image is preloaded and served locally. On desktop, requestAnimationFram
 
 ## Deploy to Vercel after approval
 
-The production target is **only `landing/`**. Vercel serves four allowlisted static files built into `public/`, with Python functions at `/api/config` and `/api/signup`. They import only `landing/backend`, independently of Workspace and the local preview server. Production uses Supabase Postgres over HTTPS through the small `SupabaseStore.save` adapter. It never writes signup data to the function filesystem.
+The production target is **only `landing/`**. Vercel serves four allowlisted static files built into `public/`, with Python functions at `/api/config` and `/api/signup`. They import only `landing/backend`, independently of Workspace and the local preview server. Production uses Supabase Postgres over HTTPS through a restricted RPC called by the small `SupabaseStore.save` adapter. It never writes signup data to the function filesystem.
 
-`/api/config` returns a short-lived signed submission token when server configuration is present. The static page starts disabled and enables submission only after this response. Missing configuration returns 503. Database connectivity, schema and permissions are checked by the insert operation, whose failure also returns 503. A successful insert must acknowledge the submitted UUID before the API returns 201. No response exposes credentials or database details.
+`/api/config` returns a short-lived signed submission token when server configuration is present. The static page starts disabled and enables submission only after this response. Missing configuration returns 503. Database connectivity, RPC authorization, schema and permissions are checked by the insert operation, whose failure also returns 503. A successful insert must acknowledge the submitted UUID before the API returns 201. No response exposes credentials or database details.
 
 ### Variables in Vercel Settings → Environment Variables
 
@@ -40,14 +40,15 @@ The production target is **only `landing/`**. Vercel serves four allowlisted sta
 | --- | --- | --- |
 | `SCOP_PUBLIC_ORIGIN` | Exact HTTPS origin, such as `https://scop.example.com`, without trailing slash or path | Configure separately per Preview/Production |
 | `SCOP_SUPABASE_URL` | Project endpoint `https://<project-ref>.supabase.co` | Server only |
-| `SCOP_SUPABASE_SERVICE_ROLE_KEY` | Supabase legacy `service_role` JWT from that project | Sensitive server-only variable |
+| `SCOP_SUPABASE_PUBLISHABLE_KEY` | Low-privilege Supabase publishable key used by the server to reach the restricted RPC | Server variable |
+| `SCOP_SUPABASE_RPC_SECRET` | Independent random secret of at least 32 characters checked inside the signup RPC | Sensitive server-only variable |
 | `SCOP_SIGNUP_SECRET` | Independent random secret of at least 32 characters, e.g. generated with `openssl rand -hex 32` | Sensitive server-only variable |
 
-Use a dedicated Supabase project for these signups. The service-role key bypasses RLS and must never appear in frontend code, a public variable, source control, screenshots or logs. Use separate databases and secrets for Preview and Production. This adapter expects the legacy service-role JWT, not an anonymous/publishable key. Custom Supabase domains are not supported by the fixed endpoint allowlist.
+Use a dedicated Supabase project for these signups. The publishable key has low privileges and cannot insert directly into `scop_signups`; the server-only RPC secret is required by the restricted `SECURITY DEFINER` function. Keep the RPC and HMAC secrets out of frontend code, source control, screenshots and logs. Use separate secrets for Preview and Production. Custom Supabase domains are not supported by the fixed endpoint allowlist.
 
 ### Exact setup sequence
 
-1. In Supabase, create the dedicated project and run `landing/schema.sql` once in **SQL Editor**. It creates `public.scop_signups`, enables RLS and denies table access to anonymous/authenticated clients. Copy the project URL and service-role key into the sensitive Vercel variables. Never insert real personal data during validation.
+1. In Supabase, create the dedicated project and run `landing/schema.sql` once in **SQL Editor**. It creates `public.scop_signups`, enables RLS and denies table access to anonymous/authenticated clients. Configure the project URL, publishable key and an independent server-only RPC secret in Vercel. Provision the same RPC secret in `private.scop_signup_config`; never commit the real secret. Never insert real personal data during validation.
 2. In Vercel, choose **Add New → Project**, import `sovereis/SCOP`, and choose **Other** for the framework. Set **Root Directory** to `landing`. Disable inclusion of files outside the root directory. The config sets **Build Command** to `python3 build.py` and **Output Directory** to `public`. Leave the install command empty. Python 3.12 is selected by `.python-version`.
 3. Use branch `feat/landing-page-v01` for the initial review deployment. In **Settings → Git**, set the production branch deliberately when preparing Production. `git.deploymentEnabled: false` prevents later Git pushes from triggering deployments. This task has not created a Vercel project or clicked **Deploy**.
 4. Only when publication is authorized, click **Deploy**. If a deployment/domain is needed to determine the origin, the first deployment can omit variables and safely leave signup disabled. In **Settings → Domains**, choose the final domain, set `SCOP_PUBLIC_ORIGIN` to that exact HTTPS origin, configure the other variables, and manually **Redeploy**. Environment changes require a new deployment. Each accepted hostname must match the configured origin; use the configured domain for testing rather than an alternate deployment alias.
