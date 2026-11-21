@@ -50,3 +50,34 @@ form.addEventListener('submit', async event => {
     button.disabled = false;
   }
 });
+
+// One scheduled frame per scroll event batch; no perpetual animation loop.
+const motionQuery = matchMedia('(prefers-reduced-motion: no-preference) and (min-width: 1001px)');
+const hero = document.querySelector('.hero');
+const art = document.querySelector('.hero-art');
+const depth = document.querySelector('.hero-depth');
+const content = document.querySelector('.hero-content');
+let motionFrame = null;
+let heroHeight = hero.offsetHeight;
+function paintDepth() {
+  motionFrame = null;
+  if (!motionQuery.matches) return;
+  const progress = Math.min(Math.max(window.scrollY / heroHeight, 0), 1);
+  depth.style.transform = `translate3d(0, ${progress * 15}px, -35px)`;
+  art.style.transform = `translate3d(0, ${progress * 40}px, 0) scale(${1 + progress * 0.025}) rotateX(${progress * 1.2}deg)`;
+  content.style.transform = `translate3d(0, ${progress * -10}px, 15px)`;
+}
+function scheduleDepth() {
+  if (motionQuery.matches && motionFrame === null) motionFrame = requestAnimationFrame(paintDepth);
+}
+function resetMotion() {
+  if (motionFrame !== null) cancelAnimationFrame(motionFrame);
+  motionFrame = null;
+  for (const layer of [depth, art, content]) layer.style.removeProperty('transform');
+  heroHeight = hero.offsetHeight;
+  scheduleDepth();
+}
+window.addEventListener('scroll', scheduleDepth, {passive:true});
+window.addEventListener('resize', resetMotion, {passive:true});
+motionQuery.addEventListener('change', resetMotion);
+scheduleDepth();

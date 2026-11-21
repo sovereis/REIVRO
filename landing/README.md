@@ -1,6 +1,6 @@
 # SCOP landing page v0.1
 
-An original SCOP composition built around the supplied black-and-silver character reference, a graphite background, warm orange accents and an open geometric wordmark. The page distinguishes the current public-PR review MVP from the planned ecosystem. Source copy and the hero follow the user brief. The supplied README is visual guidance, with the user's request controlling scope.
+An original SCOP composition built around the supplied black-and-silver character reference, a graphite background, silver highlights and an open geometric wordmark. The page distinguishes the current public-PR review MVP from the planned ecosystem. Source copy and the hero follow the user brief. The supplied README is visual guidance, with the user's request controlling scope.
 
 ## Preview and real signup storage
 
@@ -24,9 +24,9 @@ The runtime uses Python's standard library. It reuses the existing private-direc
 
 ## Image and visual implementation
 
-`assets/hero.webp` is a format-optimized copy of the user-supplied `scop-hero-reference.png` (1663 × 946). Its aspect ratio is preserved with CSS, and positioning adapts to the viewport. The desktop gradient creates text space to the left. The mobile overlay supports legibility. No external fonts, analytics, stock claims, partner logos or ClearPath branding are included. Confirm rights to the supplied image before public publication.
+`assets/hero.webp` is a faithful image-tool adaptation of the new inline reference (1672 × 941), encoded as WebP. The inline attachment was visible but had no downloadable original path, so the adapted asset should be visually reviewed against the supplied image. Its aspect ratio is preserved with CSS, and positioning adapts to the viewport. The desktop gradient creates text space to the left. The mobile overlay supports legibility. No external fonts, analytics, stock claims, partner logos or ClearPath branding are included. Confirm rights to the supplied image before public publication.
 
-The hero image is preloaded and served locally. Animations are limited to smooth anchor scrolling and button transitions when reduced motion is not requested. The UI includes a skip link, visible keyboard focus, field labels, inline errors, consent and live submission feedback.
+The hero image is preloaded and served locally. On desktop, requestAnimationFrame applies bounded scroll transforms to the artwork, ambient light and content. The artwork keeps the character and architecture together, with a separate ambient lighting plane providing the additional depth. There is no extracted character mesh. A metallic sheen moves across focused or hovered primary buttons. Scroll transforms and the sheen are disabled for reduced motion and widths below 1001 px. The UI includes a skip link, visible keyboard focus, field labels, inline errors, consent and live submission feedback.
 
 ## Publication plan
 
@@ -49,4 +49,4 @@ tests/ui/node_modules/.bin/playwright install --with-deps chromium
 node --test tests/ui/*.test.cjs
 ```
 
-For an existing browser use `SCOP_CHROMIUM=/usr/bin/chromium`; set `PYTHON` to your pytest-equipped interpreter for browser fixtures. Browser tests use disposable private stores and synthetic contact data. They exercise real writes, consent, validation, errors, disabled collection, keyboard focus and horizontal layout at 1440, 768 and 390 px. Screenshots are written to `/tmp/scop-landing-{desktop,tablet,mobile}.png`. Existing Workspace browser tests remain included. Required CI runs both suites.
+For an existing browser use `SCOP_CHROMIUM=/usr/bin/chromium`; set `PYTHON` to your pytest-equipped interpreter for browser fixtures. Browser tests use disposable private stores and synthetic contact data. They exercise real writes, consent, validation, errors, disabled collection, keyboard focus and horizontal layout at 1440, 1024, 768 and 390 px. Screenshots are written to `/tmp/scop-landing-{desktop,tablet,mobile}.png`. Existing Workspace browser tests remain included. Required CI runs both suites.
