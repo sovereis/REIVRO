@@ -30,7 +30,7 @@ test('production bootstrap, same-origin routes and unavailable database UI', asy
           await page.locator('#problem').fill('test challenge');
           await page.locator('#consent').check();
           await page.locator('#submit').click();
-          await page.getByText('Your interest has been saved. Thank you for helping shape SCOP.',{exact:true}).waitFor();
+          await page.getByText('Your interest has been saved. Thank you for helping shape REIVRO.',{exact:true}).waitFor();
         }
       } finally {await page.close();child.kill();}
     }
