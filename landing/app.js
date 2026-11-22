@@ -58,7 +58,7 @@ form.addEventListener('submit', async event => {
     });
     const result = await response.json();
     if (!response.ok || result.saved !== true) throw new Error('Submission failed');
-    status.textContent = 'Your interest has been saved. Thank you for helping shape SCOP.';
+    status.textContent = 'Your interest has been saved. Thank you for helping shape REIVRO.';
     form.reset();
   } catch {
     status.textContent = 'We could not confirm your submission. Please try again later. No confirmation email has been sent.';
