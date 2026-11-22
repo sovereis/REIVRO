@@ -53,7 +53,7 @@ test('responsive original hero, keyboard navigation, actual signup and failure s
   const saved = page.waitForResponse(response => response.url().endsWith('/api/signup'));
   await page.locator('#submit').click();
   assert.equal((await saved).status(), 201);
-  await page.getByText('Your interest has been saved. Thank you for helping shape SCOP.', {exact:true}).waitFor();
+  await page.getByText('Your interest has been saved. Thank you for helping shape REIVRO.', {exact:true}).waitFor();
   await page.locator('#email').fill('tester@example.com');
   await page.locator('#tool').fill('Test tool');
   await page.locator('#problem').fill('Another test response.');
@@ -105,7 +105,9 @@ test('scroll depth changes on desktop and resets for reduced motion and mobile',
     const channels = color.match(/\d+/g);
     if (!channels) return true;
     const rgb = channels.slice(0,3).map(Number);
-    return Math.max(...rgb) - Math.min(...rgb) < 35 || (rgb[2] >= rgb[1] && rgb[1] >= rgb[0] && rgb[2] <= 110);
+    const spread = Math.max(...rgb) - Math.min(...rgb);
+    const coolNeutral = rgb[2] >= rgb[1] && rgb[1] >= rgb[0] && (rgb[2] - rgb[0]) <= 55;
+    return spread < 35 || coolNeutral;
   }));
   await page.close();
 });
