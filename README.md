@@ -1,6 +1,6 @@
-# SCOP Workspace
+# REIVRO Workspace
 
-SCOP reviews a public GitHub pull request locally. It shows a summary with links and exact source excerpts for each claim.
+REIVRO reviews a public GitHub pull request locally. It shows a summary with links and exact source excerpts for each claim.
 
 ## Quick start on Linux or Windows with WSL
 
@@ -16,11 +16,11 @@ SCOP reviews a public GitHub pull request locally. It shows a summary with links
 
 4. Keep the terminal open and visit **http://127.0.0.1:8765** in your browser. On WSL, that can be your Windows browser. Try `https://github.com/pallets/flask/pull/5808` and tick the read-only GitHub consent box before generating a summary.
 
-Workflow completion means SCOP ran its required steps and matched the cited excerpts. Review each claim in context before deciding whether to accept it or request rework.
+Workflow completion means REIVRO ran its required steps and matched the cited excerpts. Review each claim in context before deciding whether to accept it or request rework.
 
 ## Optional local recording
 
-An unrecorded review works immediately. To enable recording and human evaluation, stop SCOP with Ctrl+C and restart it with a dedicated private directory outside every Git checkout. On WSL, use its Linux filesystem (for example, a path under your WSL home).
+An unrecorded review works immediately. To enable recording and human evaluation, stop REIVRO with Ctrl+C and restart it with a dedicated private directory outside every Git checkout. On WSL, use its Linux filesystem (for example, a path under your WSL home).
 
 ```sh
 mkdir -m 700 "$HOME/scop-measurements"
@@ -32,7 +32,7 @@ Recording and feedback each require explicit consent in the browser. Leave unkno
 ## Troubleshooting
 
 - **Wrong shell or missing Python:** in Windows Terminal, select Ubuntu or run `wsl -d Ubuntu`, then check `python3.12 --version` and `cd` to the checkout.
-- **Local origin denied:** open the exact address printed by SCOP, including `127.0.0.1` and the port. If your Windows browser cannot reach WSL, verify the server is still running and check WSL localhost forwarding. Keep the listener on loopback.
+- **Local origin denied:** open the exact address printed by REIVRO, including `127.0.0.1` and the port. If your Windows browser cannot reach WSL, verify the server is still running and check WSL localhost forwarding. Keep the listener on loopback.
 - **Recording disabled:** restart with `--store-dir` or continue without recording.
 - **Invalid URL:** use the PR's main page, with a positive PR number and no extra path, query, or fragment.
 - **GitHub unavailable:** check connectivity from Linux or WSL, confirm the PR is public, and retry after rate limits reset if applicable. Missing patch evidence can also block a review.
