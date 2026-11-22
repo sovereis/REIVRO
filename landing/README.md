@@ -1,6 +1,6 @@
-# SCOP landing page v0.1
+# REIVRO landing page v0.1
 
-An original SCOP composition built around the supplied astronaut contemplating Earth reference, a graphite background, silver highlights, deep navy supporting surfaces and an open geometric wordmark. The page distinguishes the current public-PR review MVP from the planned ecosystem. Source copy and the hero follow the user brief. The supplied README is visual guidance, with the user's request controlling scope.
+An original REIVRO composition built around the supplied astronaut contemplating Earth reference, a graphite background, silver highlights, deep navy supporting surfaces and an open geometric wordmark. The page distinguishes the current public-PR review MVP from the planned ecosystem. Source copy and the hero follow the user brief. The supplied README is visual guidance, with the user's request controlling scope.
 
 ## Preview and real signup storage
 
@@ -49,7 +49,7 @@ Use a dedicated Supabase project for these signups. The publishable key has low 
 ### Exact setup sequence
 
 1. In Supabase, create the dedicated project and run `landing/schema.sql` once in **SQL Editor**. It creates `public.scop_signups`, enables RLS and denies table access to anonymous/authenticated clients. Configure the project URL, publishable key and an independent server-only RPC secret in Vercel. Provision the same RPC secret in `private.scop_signup_config`; never commit the real secret. Never insert real personal data during validation.
-2. In Vercel, choose **Add New → Project**, import `sovereis/SCOP`, and choose **Other** for the framework. Set **Root Directory** to `landing`. Disable inclusion of files outside the root directory. The config sets **Build Command** to `python3 build.py` and **Output Directory** to `public`. Leave the install command empty. Python 3.12 is selected by `.python-version`.
+2. In Vercel, choose **Add New → Project**, import `sovereis/REIVRO`, and choose **Other** for the framework. Set **Root Directory** to `landing`. Disable inclusion of files outside the root directory. The config sets **Build Command** to `python3 build.py` and **Output Directory** to `public`. Leave the install command empty. Python 3.12 is selected by `.python-version`.
 3. Use branch `feat/landing-page-v01` for the initial review deployment. In **Settings → Git**, set the production branch deliberately when preparing Production. `git.deploymentEnabled: false` prevents later Git pushes from triggering deployments. This task has not created a Vercel project or clicked **Deploy**.
 4. Only when publication is authorized, click **Deploy**. If a deployment/domain is needed to determine the origin, the first deployment can omit variables and safely leave signup disabled. In **Settings → Domains**, choose the final domain, set `SCOP_PUBLIC_ORIGIN` to that exact HTTPS origin, configure the other variables, and manually **Redeploy**. Environment changes require a new deployment. Each accepted hostname must match the configured origin; use the configured domain for testing rather than an alternate deployment alias.
 5. Before allowing public traffic, enable appropriate Vercel Firewall rate limits for `/api/signup`, configure operator contact, retention and deletion details in the privacy copy, and protect Preview deployments with Vercel's deployment protection. Configure backups and restrict Supabase administrative access.
