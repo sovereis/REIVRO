@@ -33,7 +33,7 @@ test('responsive original hero, keyboard navigation, actual signup and failure s
   await page.goto(origin);
   await page.keyboard.press('Tab');
   assert.ok(await page.getByRole('link', {name:'Skip to content'}).evaluate(node => node === document.activeElement));
-  assert.match(await page.locator('h1').innerText(), /One ecosystem/);
+  assert.match(await page.locator('h1').innerText(), /But they forget context/);
   await page.locator('h1').click();
   for (const [width,height,label] of [[1440,1000,'desktop'],[1024,900,'small-desktop'],[768,1024,'tablet'],[390,844,'mobile']]) {
     await page.setViewportSize({width,height});

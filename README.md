@@ -9,8 +9,8 @@ REIVRO reviews a public GitHub pull request locally. It shows a summary with lin
 3. Clone and launch from the repository root.
 
    ```sh
-   git clone https://github.com/sovereis/SCOP.git
-   cd SCOP
+   git clone https://github.com/sovereis/REIVRO.git
+   cd REIVRO
    python3.12 -B -m server.scop_web
    ```
 
