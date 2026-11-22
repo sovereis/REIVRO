@@ -1,6 +1,6 @@
 # REIVRO landing page v0.1
 
-An original REIVRO composition built around the supplied astronaut contemplating Earth reference, a graphite background, silver highlights, deep navy supporting surfaces and an open geometric wordmark. The page distinguishes the current public-PR review MVP from the planned ecosystem. Source copy and the hero follow the user brief. The supplied README is visual guidance, with the user's request controlling scope.
+An original REIVRO composition built around the supplied astronaut contemplating Earth reference, a graphite background, silver highlights, deep navy supporting surfaces and an open geometric wordmark. The page distinguishes the current public-PR review MVP from the planned Rework Firewall. Source copy and the hero follow the user brief. The supplied README is visual guidance, with the user's request controlling scope.
 
 ## Preview and real signup storage
 

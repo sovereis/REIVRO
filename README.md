@@ -1,6 +1,25 @@
-# REIVRO Workspace
+# REIVRO
 
-REIVRO reviews a public GitHub pull request locally. It shows a summary with links and exact source excerpts for each claim.
+REIVRO is being built to verify AI-generated development work, learn from failures, and prevent recurring mistakes from creating rework.
+
+**VERIFY → LEARN → PREVENT**
+
+AI coding agents can generate code, execute tasks, and report completion. Their claims do not always match the actual state of the repository. REIVRO aims to close that gap through evidence-based verification and reusable protections.
+
+## Current MVP — AVAILABLE
+
+The local MVP analyzes public GitHub pull requests and produces summaries grounded in traceable source evidence. It verifies cited excerpts, not arbitrary task completion or overall code correctness. This is the first verification foundation toward the broader Rework Firewall vision.
+
+## Product direction — IN DEVELOPMENT / PLANNED
+
+- **VERIFY (IN DEVELOPMENT):** expand the PR evidence foundation to compare task requirements and agent claims against code, diffs, tests and logs.
+- **LEARN (PLANNED):** turn detected failures into reusable project knowledge and developer-approved protections.
+- **PREVENT (PLANNED):** apply relevant reviewed safeguards to reduce recurring mistakes and rework.
+- **PROTOTYPE:** Regression Test Generator has upstream validation records but no runtime adapter. It is not executable through the current workflow.
+
+The Rework Firewall is a product direction, not an implemented end-to-end guarantee. Cross-agent support and productivity gains have not been demonstrated. The skills catalog remains a technical inventory, not the product's primary promise.
+
+See [product direction and capability boundaries](docs/PRODUCT.md).
 
 ## Quick start on Linux or Windows with WSL
 

@@ -1,5 +1,5 @@
 # REIVRO Server
 
-Backend infrastructure and services for the REIVRO AI ecosystem.
+Backend infrastructure for REIVRO’s evidence-based verification foundation. See [product direction](../docs/PRODUCT.md) for current capabilities and planned Rework Firewall work.
 
 Status: Under development.
