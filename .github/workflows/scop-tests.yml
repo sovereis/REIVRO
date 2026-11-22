@@ -1,4 +1,4 @@
-name: SCOP tests
+name: REIVRO tests
 
 on:
   pull_request:
