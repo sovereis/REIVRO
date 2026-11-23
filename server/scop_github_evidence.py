@@ -13,6 +13,7 @@ import re
 import runpy
 import sys
 from time import monotonic
+from urllib.parse import unquote, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .scop_runtime import (
@@ -27,6 +28,11 @@ _NETWORK_BUDGET_SECONDS = 30
 _ENDPOINT = re.compile(
     r"https://api\.github\.com/repos/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+"
     r"/pulls/[1-9][0-9]*(?:/files\?per_page=100&page=[1-3])?"
+)
+_CONTENT_ENDPOINT = re.compile(
+    r"https://api\.github\.com/repos/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+"
+    r"/contents/(?:(?:[a-zA-Z0-9_.~-]|%[0-9A-F]{2})+/)*"
+    r"(?:[a-zA-Z0-9_.~-]|%[0-9A-F]{2})+\?ref=[0-9a-f]{40}"
 )
 _ROOT = Path(__file__).resolve().parents[1]
 _VALIDATOR_PATH = _ROOT / "tests" / "pr-source-summary" / "validate.py"
@@ -72,9 +78,18 @@ def _remaining(deadline: float) -> float:
     return remaining
 
 
+def _valid_content_url(url: str) -> bool:
+    if not _CONTENT_ENDPOINT.fullmatch(url):
+        return False
+    segments = (unquote(part) for part in urlsplit(url).path.split("/")[2:])
+    return all(part not in {"", ".", ".."} and "/" not in part and "\\" not in part
+               and all(ord(char) >= 32 and ord(char) != 127 for char in part)
+               for part in segments)
+
+
 def fetch_json(url: str, deadline: float):
     """Fetch bounded JSON from a fixed GitHub API endpoint."""
-    if not _ENDPOINT.fullmatch(url):
+    if not (_ENDPOINT.fullmatch(url) or _valid_content_url(url)):
         raise _Unavailable("unsupported evidence endpoint")
     request = Request(url, headers={
         "Accept": "application/vnd.github+json",

@@ -1,4 +1,4 @@
-"""Check public GitHub PRs for whitespace errors in added Python lines."""
+"""Run deterministic checks on public GitHub pull requests."""
 import argparse
 from dataclasses import asdict, dataclass
 from hashlib import sha256
@@ -159,7 +159,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("pr_url", help="Canonical public GitHub PR URL")
     parser.add_argument("--permission", action="append", default=[], help=f"Required opt-in: {GITHUB_READ}")
+    parser.add_argument("--rule", choices=(RULE, "python-syntax-regression"), default=RULE)
     args = parser.parse_args()
+    if args.rule != RULE:
+        from .scop_verify_syntax import verify_syntax
+
+        result = verify_syntax(args.pr_url, tuple(args.permission))
+        print(json.dumps(result, indent=2))
+        return {"PASS": 0, "ERROR": 1, "INCONCLUSIVE": 2,
+                "REGRESSION_DETECTED": 3}[result["status"]]
     result = verify(args.pr_url, tuple(args.permission))
     print(json.dumps(asdict(result), indent=2))
     if result.status == Status.COMPLETED:
