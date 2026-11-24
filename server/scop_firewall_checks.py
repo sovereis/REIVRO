@@ -200,7 +200,7 @@ class StagingMemory:
                         allow_null=True)
 
 
-class GitHub:
+class GitHubEvidence:
     """Use an externally issued installation token. It is never sent to the compiler."""
 
     def __init__(self, token, project):
@@ -236,6 +236,10 @@ class GitHub:
             raise ArtifactUnavailable("Trusted protection artifact failed blob integrity")
         return raw
 
+
+class GitHub(GitHubEvidence):
+    """Legacy CLI client with Check publication authority."""
+
     def publish(self, check):
         return _request("POST", self.url + "/check-runs", self.headers, check, limit=65536)
 
@@ -252,7 +256,7 @@ def _error_report(status, reason):
     return {"rule": RULE, "status": status, "reason": reason, "files": []}
 
 
-def _inspect(project, revision, claim, github):
+def _inspect(project, revision, claim, github, executor=None):
     if claim.get("protection_id") is not None:
         expected = _sha(claim.get("artifact_digest"), _DIGEST)
         try:
@@ -272,7 +276,8 @@ def _inspect(project, revision, claim, github):
     if project_key(name) != project.repository:
         raise CheckError("Inconsistent canonical repository")
     url = f"https://github.com/{name}/pull/{revision.pr}"
-    report = verify_syntax(url, (GITHUB_READ,))
+    options = {} if executor is None else {"executor": executor}
+    report = verify_syntax(url, (GITHUB_READ,), **options)
     if report["status"] in {"PASS", "REGRESSION_DETECTED"} and (
         report.get("head_sha") != revision.head_sha or report.get("base_sha") != revision.base_sha
         or report.get("pr_url") != url or str(report.get("repository")).lower() != project.repository
@@ -282,7 +287,7 @@ def _inspect(project, revision, claim, github):
     return report, actual
 
 
-def handle(body, signature, delivery, event, *, project, secret, memory, github, publish=True):
+def analyze(body, signature, delivery, event, *, project, secret, memory, github, executor=None):
     key, revision = authenticate(body, signature, delivery, event, secret, project)
     if not _same_revision(github, project, revision):
         return {"status": "STALE"}
@@ -295,7 +300,7 @@ def handle(body, signature, delivery, event, *, project, secret, memory, github,
         return {"status": "DUPLICATE"}
     run = _canonical_uuid(claim.get("run_id"))
     try:
-        report, digest = _inspect(project, revision, claim, github)
+        report, digest = _inspect(project, revision, claim, github, executor)
         if not _same_revision(github, project, revision):
             report, digest = _error_report("INCONCLUSIVE", "PR moved during verification"), None
     except (CheckError, KeyError, TypeError, AttributeError):
@@ -311,23 +316,55 @@ def handle(body, signature, delivery, event, *, project, secret, memory, github,
         report["status"] != {"PASS": "PASS", "VIOLATION": "REGRESSION_DETECTED"}[outcome]
     ):
         raise CheckError("Staging outcome does not match verified evidence")
-    if not publish:
-        return {"status": outcome, "run_id": run, "head_sha": revision.head_sha}
+    return {"status": outcome, "run_id": run, "head_sha": revision.head_sha}
+
+
+def publish_result(result, publisher):
+    """Send a single Check. An ambiguous acknowledgement always requires review."""
+    outcome = result["status"]
+    run = _canonical_uuid(result["run_id"])
+    head = _sha(result["head_sha"])
     try:
-        check = github.publish({
-            "name": "REIVRO Firewall (staging)", "head_sha": revision.head_sha,
+        check = publisher.publish({
+            "name": "REIVRO Firewall (staging)", "head_sha": head,
             "external_id": run, "status": "completed", "conclusion": _CONCLUSION[outcome],
             "output": {"title": outcome, "summary": _SUMMARY[outcome] + f" Audit run: `{run}`."},
         })
-        if (check.get("head_sha") != revision.head_sha or check.get("external_id") != run
+        if (check.get("head_sha") != head or check.get("external_id") != run
                 or check.get("status") != "completed" or check.get("conclusion") != _CONCLUSION[outcome]):
             raise CheckError("Check response does not match requested publication")
-        return {"status": outcome, "run_id": run, "head_sha": revision.head_sha,
+        return {"status": outcome, "run_id": run, "head_sha": head,
                 "check_id": _id(check["id"])}
     except (CheckError, KeyError, TypeError):
         # Delivery remains consumed. A timed-out POST may already have succeeded.
         return {"status": "PUBLICATION_UNCERTAIN", "run_id": run,
-                "head_sha": revision.head_sha, "outcome": outcome}
+                "head_sha": head, "outcome": outcome}
+
+
+def reconcile_publication(result, app_id, candidates):
+    """Confirm one exact Check from a complete read-only lookup, or hold for review."""
+    if result["status"] != "PUBLICATION_UNCERTAIN":
+        raise CheckError("Expected uncertain Check publication")
+    app_id = _id(app_id)
+    run = _canonical_uuid(result["run_id"])
+    head = _sha(result["head_sha"])
+    matches = [check for check in candidates if check.get("external_id") == run]
+    if len(matches) == 1:
+        check = matches[0]
+        if (check.get("app", {}).get("id") == app_id
+                and check.get("name") == "REIVRO Firewall (staging)"
+                and check.get("head_sha") == head and check.get("status") == "completed"
+                and check.get("conclusion") == _CONCLUSION[result["outcome"]]):
+            return {"status": "CONFIRMED", "check_id": _id(check.get("id")), "run_id": run}
+    return {"status": "REVIEW_REQUIRED", "run_id": run}
+
+
+def handle(body, signature, delivery, event, *, project, secret, memory, github, publish=True):
+    result = analyze(body, signature, delivery, event, project=project, secret=secret,
+                     memory=memory, github=github)
+    if publish and "run_id" in result:
+        return publish_result(result, github)
+    return result
 
 
 def main():

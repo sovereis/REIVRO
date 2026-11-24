@@ -22,7 +22,7 @@ O manifesto privado da rodada anterior tem modo `0600` e permanece fora do Git. 
 | Permissões de repositório | Metadata read, Pull requests read, Contents read, Checks write |
 | Outras permissões | Nenhuma de organização ou conta |
 | Webhook | Ativo, HTTPS, verificação TLS habilitada, segredo aleatório dedicado de pelo menos 32 bytes no Vault |
-| URL de webhook | `https://<host-piloto-aprovado>/webhooks/github` |
+| URL de webhook | `https://pilot.reivrotools.com/webhooks/github` |
 | Evento | Pull request, com processamento de opened, reopened e synchronize |
 | OAuth de usuário | Sem callback ou autorização de usuário |
 | Branch base | `main`, com escrita limitada aos mantenedores e sem Check obrigatório |

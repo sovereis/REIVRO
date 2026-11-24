@@ -9,11 +9,22 @@ import os
 from pathlib import Path
 import sqlite3
 import time
+from typing import Protocol
 
 from server import scop_firewall_checks as checks
 
 STAGING = "lbklqqqbmeyseeccdqog"
 RETENTION = timedelta(days=14).total_seconds()
+
+
+class QueueUnavailable(Exception):
+    """The queue could not confirm durable acceptance."""
+
+
+class DeliveryQueue(Protocol):
+    def add(self, key: str, body: bytes, signature: str) -> None: ...
+    def claim(self) -> tuple[str, bytes, str] | None: ...
+    def finish(self, key: str, state: str, result: dict) -> None: ...
 
 
 class Queue:
@@ -36,11 +47,14 @@ class Queue:
 
     def add(self, key, body, signature):
         now = time.time()
-        with closing(self.connect()) as db, db:
-            db.execute("""
-                INSERT INTO deliveries VALUES (?, ?, ?, 'pending', ?, ?, NULL)
-                ON CONFLICT(id) DO NOTHING
-            """, (key, body, signature, now, now))
+        try:
+            with closing(self.connect()) as db, db:
+                db.execute("""
+                    INSERT INTO deliveries VALUES (?, ?, ?, 'pending', ?, ?, NULL)
+                    ON CONFLICT(id) DO NOTHING
+                """, (key, body, signature, now, now))
+        except sqlite3.Error as exc:
+            raise QueueUnavailable("Durable delivery acceptance failed") from exc
 
     def claim(self):
         with closing(self.connect()) as db, db:
@@ -58,9 +72,11 @@ class Queue:
     def finish(self, key, state, result):
         with closing(self.connect()) as db, db:
             db.execute("""
-                UPDATE deliveries SET state=?, result=?, body=NULL, signature=NULL, updated=?
+                UPDATE deliveries SET state=?, result=?,
+                    body=CASE WHEN ? THEN body ELSE NULL END,
+                    signature=CASE WHEN ? THEN signature ELSE NULL END, updated=?
                 WHERE id=? AND state='running'
-            """, (state, json.dumps(result), time.time(), key))
+            """, (state, json.dumps(result), state == "review", state == "review", time.time(), key))
 
     def prune(self):
         with closing(self.connect()) as db, db:
@@ -71,6 +87,12 @@ class Queue:
             return {state: {"count": count, "oldest_seconds": int(time.time() - oldest)}
                     for state, count, oldest in db.execute(
                         "SELECT state, count(*), min(received) FROM deliveries GROUP BY state")}
+
+
+def accept_delivery(queue: DeliveryQueue, project, secret, body, signature, delivery, event):
+    key, _ = checks.authenticate(body, signature, delivery, event, secret, project)
+    queue.add(key, body, signature)
+    return key
 
 
 def receiver(queue, project, secret):
@@ -109,27 +131,25 @@ def receiver(queue, project, secret):
                 return self.respond(400)
             signature = self.headers.get("X-Hub-Signature-256")
             try:
-                key, _ = checks.authenticate(body, signature, self.headers.get("X-GitHub-Delivery"),
-                                             self.headers.get("X-GitHub-Event"), secret, project)
+                accept_delivery(queue, project, secret, body, signature,
+                                self.headers.get("X-GitHub-Delivery"), self.headers.get("X-GitHub-Event"))
             except checks.CheckError:
                 return self.respond(403)
-            try:
-                queue.add(key, body, signature)
-            except sqlite3.Error:
+            except QueueUnavailable:
                 return self.respond(503)
             return self.respond(202)
 
     return Receiver
 
 
-def process(queue, project, secret, memory, github):
+def process(queue: DeliveryQueue, project, secret, memory, github, *, executor=None):
     item = queue.claim()
     if item is None:
         return False
     key, body, signature = item
     try:
-        result = checks.handle(body, signature, key, "pull_request", project=project,
-                               secret=secret, memory=memory, github=github, publish=False)
+        result = checks.analyze(body, signature, key, "pull_request", project=project,
+                                secret=secret, memory=memory, github=github, executor=executor)
     except checks.CheckError:
         result = {"status": "REVIEW_REQUIRED"}
     state = "review" if result["status"] in {"ERROR", "REVIEW_REQUIRED", "DUPLICATE"} else "done"
@@ -175,7 +195,7 @@ def main():
                 time.sleep(2)
                 continue
             memory = checks.StagingMemory(STAGING, credential("publishable-key"), credential("worker-jwt"))
-            github = checks.GitHub(credential("github-installation-token"), project)
+            github = checks.GitHubEvidence(credential("github-installation-token"), project)
             process(queue, project, secret, memory, github)
 
 

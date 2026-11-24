@@ -137,7 +137,7 @@ def _patch_lines(item, base, head):
     return added
 
 
-def _check_file(identity, head, base, path, item, deadline):
+def _check_file(identity, head, base, path, item, deadline, executor):
     status = item.get("status")
     if status in {"added", "removed"}:
         return {"status": "INCONCLUSIVE", "reason": f"{status.capitalize()} file lacks a comparable pair"}
@@ -156,10 +156,10 @@ def _check_file(identity, head, base, path, item, deadline):
         raise _Insufficient("Python patch unavailable")
     else:
         changed = _patch_lines(item, before, after)
-    baseline = _compile(before, deadline)
+    baseline = executor(before, deadline)
     if baseline["kind"] != "valid":
         raise _Insufficient("BASE did not compile with the supported compiler")
-    current = _compile(after, deadline)
+    current = executor(after, deadline)
     if current["kind"] == "valid":
         return {"status": "PASS"}
     if current["kind"] != "syntax":
@@ -183,7 +183,8 @@ def _check_file(identity, head, base, path, item, deadline):
     }
 
 
-def verify_syntax(pr_url, permissions=()):
+def verify_syntax(pr_url, permissions=(), *, executor=None):
+    executor = _compile if executor is None else executor
     report = {"rule": RULE, "status": "ERROR", "pr_url": None,
               "compiler": sys.version.split()[0], "files": []}
     if permissions != (github.GITHUB_READ,):
@@ -209,7 +210,7 @@ def verify_syntax(pr_url, permissions=()):
         results = []
         for path, item in sorted(python_files.items()):
             try:
-                result = _check_file(identity, head, base, path, item, deadline)
+                result = _check_file(identity, head, base, path, item, deadline, executor)
             except _Insufficient as exc:
                 result = {"status": "INCONCLUSIVE", "reason": str(exc)}
             except (_Operational, github._Unavailable) as exc:

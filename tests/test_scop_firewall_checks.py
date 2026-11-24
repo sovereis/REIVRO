@@ -1,6 +1,7 @@
 """Webhook authentication, GitHub transport contracts and staged end-to-end smoke."""
 import base64
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from hashlib import sha1, sha256
 import hmac
 import json
@@ -11,7 +12,9 @@ from uuid import uuid4
 import pytest
 
 from server import scop_firewall_checks as checks
+from server import scop_firewall_pilot as pilot
 from server import scop_github_evidence as evidence
+from server import scop_verify_syntax as syntax
 
 
 PROJECT = checks.Project("example/fixture", 101, 201, "main")
@@ -176,7 +179,7 @@ def test_finish_report_matches_hosted_pr_contract(pg, monkeypatch):
     assert client.dispatch("finish", request) == {"run_id": claim["run_id"], "outcome": "OBSERVED"}
 
 
-def test_isolated_cloud_and_checks_lifecycle(pg, monkeypatch):
+def test_isolated_cloud_and_checks_lifecycle(pg, monkeypatch, tmp_path):
     # Auth subjects and GitHub responses are fixtures. PostgreSQL, RLS and the
     # VERIFY subprocess are real. No token, webhook or Check is sent to GitHub.
     scope = {"repository_id": 101, "installation_id": 201}
@@ -217,6 +220,10 @@ def test_isolated_cloud_and_checks_lifecycle(pg, monkeypatch):
 
     published = []
     def transport(method, url, headers, payload=None, limit=None):
+        if url == "https://lbklqqqbmeyseeccdqog.supabase.co/rest/v1/rpc/dispatch":
+            assert method == "POST" and headers["Content-Profile"] == "reivro_checks_api"
+            assert headers["Authorization"] == "Bearer fixture-worker"
+            return rpc(pg, WORKER, payload["action"], payload["request"])
         assert headers["Authorization"] == "Bearer fixture-installation"
         if url.endswith("/check-runs"):
             assert method == "POST"
@@ -234,7 +241,23 @@ def test_isolated_cloud_and_checks_lifecycle(pg, monkeypatch):
                                  memory=Memory(), github=checks.GitHub("fixture-installation", PROJECT))
         return response
 
-    original = send(1)
+    queue = pilot.Queue(tmp_path / "deliveries.sqlite")
+    body, signature, key, event = delivery(1)
+    pilot.accept_delivery(queue, PROJECT, SECRET, body, signature, key, event)
+    memory = checks.StagingMemory("lbklqqqbmeyseeccdqog", "sb_publishable_fixture", "fixture-worker")
+    compiled = []
+
+    def execute(source, deadline):
+        compiled.append(source)
+        return syntax._compile(source, deadline)
+
+    assert pilot.process(queue, PROJECT, SECRET, memory,
+                         checks.GitHubEvidence("fixture-installation", PROJECT), executor=execute)
+    assert compiled == [b"x = 1\n", b"x = )\n"]
+    assert published == []
+    with closing(queue.connect()) as db:
+        saved = json.loads(db.execute("SELECT result FROM deliveries WHERE id=?", (key,)).fetchone()[0])
+    original = checks.publish_result(saved, checks.GitHub("fixture-installation", PROJECT))
     assert original["status"] == "OBSERVED" and published[-1]["conclusion"] == "neutral"
     def read_run(actor):
         return pg(f"begin; set local role authenticated; set local request.jwt.claim.sub = '{actor}'; "

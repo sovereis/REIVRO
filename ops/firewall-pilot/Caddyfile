@@ -1,4 +1,4 @@
-{$REIVRO_PILOT_HOST} {
+pilot.reivrotools.com {
 	@webhook {
 		method POST
 		path /webhooks/github
@@ -7,7 +7,8 @@
 		request_body {
 			max_size 524288
 		}
-		reverse_proxy 127.0.0.1:8088
+		# Após nova autorização, substituir por: reverse_proxy 127.0.0.1:8088
+		respond 503
 	}
 	handle {
 		respond 404

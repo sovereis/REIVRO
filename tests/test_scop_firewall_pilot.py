@@ -2,6 +2,7 @@ from contextlib import closing
 from http.client import HTTPConnection
 from http.server import HTTPServer
 import json
+import sqlite3
 from threading import Thread
 import time
 from uuid import uuid4
@@ -11,7 +12,7 @@ from server import scop_firewall_pilot as pilot
 from test_scop_firewall_checks import PROJECT, SECRET, delivery, metadata, revision
 
 
-def test_receiver_validates_before_commit_and_deduplicates(tmp_path):
+def test_receiver_validates_before_commit_and_deduplicates(tmp_path, monkeypatch):
     queue = pilot.Queue(tmp_path / "queue.sqlite")
     body, signature, key, event = delivery(1)
     with HTTPServer(("127.0.0.1", 0), pilot.receiver(queue, PROJECT, SECRET)) as server:
@@ -28,11 +29,20 @@ def test_receiver_validates_before_commit_and_deduplicates(tmp_path):
             assert send(body, "invalid") == 403
             wrong, signed, _, _ = delivery(1, lambda data: data["installation"].update(id=999))
             assert send(wrong, signed) == 403
+            wrong, signed, _, _ = delivery(1, lambda data: data["repository"].update(id=999))
+            assert send(wrong, signed) == 403
             with closing(HTTPConnection(*server.server_address, timeout=5)) as client:
                 client.request("POST", "/webhooks/github", headers={
                     "Content-Length": str(checks.MAX_WEBHOOK + 1),
                 })
                 assert client.getresponse().status == 413
+            assert not queue.status()
+            with monkeypatch.context() as patch:
+                def unavailable():
+                    raise sqlite3.OperationalError("fixture disk unavailable")
+
+                patch.setattr(queue, "connect", unavailable)
+                assert send(body, signature) == 503
             assert not queue.status()
             assert send(body, signature) == 202
             assert send(body, signature) == 202
@@ -83,3 +93,17 @@ def test_worker_recovery_holds_interrupted_job_and_drains_pending(tmp_path, monk
         db.execute("UPDATE deliveries SET updated=?", (time.time() - pilot.RETENTION - 1,))
     queue.prune()
     assert not queue.status()
+
+
+def test_uncertain_publication_requires_exact_unique_match():
+    run = str(uuid4())
+    head = revision(1).head_sha
+    result = {"status": "PUBLICATION_UNCERTAIN", "run_id": run, "head_sha": head, "outcome": "PASS"}
+    match = {"id": 15, "external_id": run, "head_sha": head, "app": {"id": 9},
+             "status": "completed", "conclusion": "success", "name": "REIVRO Firewall (staging)"}
+    assert checks.reconcile_publication(result, 9, [match]) == {
+        "status": "CONFIRMED", "run_id": run, "check_id": 15}
+    for candidates in ([], [match, match], [{**match, "head_sha": revision(2).head_sha}], [match]):
+        app = 8 if candidates == [match] else 9
+        assert checks.reconcile_publication(result, app, candidates) == {
+            "status": "REVIEW_REQUIRED", "run_id": run}
