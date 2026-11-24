@@ -1,0 +1,26 @@
+[Unit]
+Description=REIVRO Firewall pilot (receive)
+After=network-online.target systemd-tmpfiles-setup.service
+
+[Service]
+Type=simple
+User=reivro-receive
+Group=reivro-pilot
+WorkingDirectory=/opt/reivro-pilot
+EnvironmentFile=/etc/reivro-pilot/pilot.env
+LoadCredential=webhook:/etc/reivro-pilot/credentials/webhook
+ExecStart=/usr/bin/python3 -B -m server.scop_firewall_pilot receive
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+IPAddressDeny=any
+IPAddressAllow=localhost
+ReadWritePaths=/var/lib/reivro-pilot
+UMask=0007
+LimitCORE=0
+
+[Install]
+WantedBy=multi-user.target

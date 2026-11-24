@@ -282,7 +282,7 @@ def _inspect(project, revision, claim, github):
     return report, actual
 
 
-def handle(body, signature, delivery, event, *, project, secret, memory, github):
+def handle(body, signature, delivery, event, *, project, secret, memory, github, publish=True):
     key, revision = authenticate(body, signature, delivery, event, secret, project)
     if not _same_revision(github, project, revision):
         return {"status": "STALE"}
@@ -311,6 +311,8 @@ def handle(body, signature, delivery, event, *, project, secret, memory, github)
         report["status"] != {"PASS": "PASS", "VIOLATION": "REGRESSION_DETECTED"}[outcome]
     ):
         raise CheckError("Staging outcome does not match verified evidence")
+    if not publish:
+        return {"status": outcome, "run_id": run, "head_sha": revision.head_sha}
     try:
         check = github.publish({
             "name": "REIVRO Firewall (staging)", "head_sha": revision.head_sha,
