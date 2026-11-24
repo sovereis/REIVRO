@@ -19,4 +19,4 @@ Proposed verification inputs include the original task, acceptance criteria, age
 
 Agents, skills, commands, MCP and workflows may remain implementation components. Their counts are not the value proposition. Existing catalog development statuses describe individual artifacts and do not imply execution adapters or product-wide availability.
 
-No cross-agent compatibility, time savings or percentage reduction in rework is claimed without measurements. The landing's domain-migration example is illustrative, not a recorded execution.
+Future metrics include AI tasks verified, incomplete claims caught, reproducible regression cases, approved project invariants and recurring mistakes prevented. Track Rework Prevented when a reviewed protection catches a recurrence before it reaches the developer as rework. Count only evidenced detections and keep that measure distinct from estimated time savings. The landing's domain-migration example is illustrative, not a recorded execution.

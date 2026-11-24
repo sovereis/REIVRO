@@ -27,8 +27,8 @@
         <p class="eyebrow"><span class="signal" aria-hidden="true"></span>Early Development · Looking for Beta Testers</p>
         <p class="hero-intro">AI coding agents are powerful.</p>
         <h1 id="hero-title">But they still <span>get things wrong.</span></h1>
-        <p class="hero-description">REIVRO is being built to verify AI-generated work, catch incomplete results, and reduce recurring rework.</p>
-        <p class="hero-note">Don't just trust &quot;done&quot;. Verify the evidence.</p>
+        <p class="hero-description">REIVRO is being built to check AI-generated work against evidence before incomplete or unsupported results become rework.</p>
+        <p class="hero-note">An agent can say &quot;done&quot; while work is still missing.</p>
         <div class="actions">
           <a class="button primary" href="#early-access">Join Early Access <span aria-hidden="true">→</span></a>
           <a class="button secondary" href="#explore">Explore REIVRO <span aria-hidden="true">↓</span></a>
@@ -38,21 +38,21 @@
     </section>
     <section id="explore" class="explore wrap" aria-labelledby="vision-title">
       <div class="section-heading"><p class="eyebrow">THE REWORK FIREWALL DIRECTION · PLANNED</p><h2 id="vision-title">VERIFY. LEARN.<br><span>PREVENT.</span></h2></div>
-      <div class="vision-copy"><p>Your AI does the work. REIVRO verifies what actually happened.</p><p>This is our product direction, not a guarantee of capabilities available today. Catch the mistake before you have to fix it twice.</p></div>
+      <div class="vision-copy"><p>Your AI does the work. REIVRO verifies what actually happened.</p><p>Rework Firewall is designed to turn a caught mistake into a safeguard you can use on future work.</p></div>
       <div class="firewall-steps">
-        <article><p class="eyebrow">01 — VERIFY · IN DEVELOPMENT</p><h3>Don't trust completion claims without evidence.</h3><p>Compare AI-generated results against the actual state of the code, tests and task requirements.</p></article>
-        <article><p class="eyebrow">02 — LEARN · PLANNED</p><h3>Turn detected failures into reusable knowledge.</h3><p>Capture reproducible mistakes and propose project-specific protections. Persistent rules require developer review and approval.</p></article>
-        <article><p class="eyebrow">03 — PREVENT · PLANNED</p><h3>Don't fix the same mistake twice.</h3><p>Apply reviewed safeguards to catch recurring issues before they create more rework. Support across coding agents remains unverified.</p></article>
+        <article><p class="eyebrow">VERIFY · IN DEVELOPMENT</p><h3>Don't trust completion claims without evidence.</h3><p>Check the original task and acceptance criteria against the diff, repository search, tests and logs.</p></article>
+        <article><p class="eyebrow">LEARN · PLANNED</p><h3>Turn detected failures into reusable knowledge.</h3><p>Capture reproducible mistakes and propose project-specific protections. Persistent rules require developer review and approval.</p></article>
+        <article><p class="eyebrow">PREVENT · PLANNED</p><h3>Don't fix the same mistake twice.</h3><p>Apply reviewed safeguards to catch recurring issues before they create more rework. Support across coding agents remains unverified.</p></article>
       </div>
       <article class="concept-demo" aria-labelledby="demo-title"><p class="eyebrow">CONCEPTUAL EXAMPLE · NOT A PRODUCT EXECUTION</p><h3 id="demo-title">How Rework Firewall is designed to work</h3><dl>
         <dt>TASK</dt><dd>Replace all public references to an old production domain.</dd>
         <dt>AGENT</dt><dd>“Done. All references updated.”</dd>
         <dt>REIVRO</dt><dd class="not-verified">NOT VERIFIED</dd>
-        <dt>EVIDENCE (ILLUSTRATIVE)</dt><dd>3 references to the old domain still exist.</dd>
+        <dt>EVIDENCE (ILLUSTRATIVE)</dt><dd>A repository search finds 3 public references to the old domain.</dd>
         <dt>SUGGESTED INVARIANT</dt><dd>Public domain migrations must leave zero legacy-domain references outside approved compatibility exceptions.</dd>
       </dl></article>
-      <article class="current"><div><p class="eyebrow">AVAILABLE · LOCAL MVP</p><h3>What works today</h3></div><div><p>The current local MVP analyzes public GitHub pull requests and produces summaries grounded in traceable source excerpts. It checks cited excerpts against GitHub evidence, records execution results, and supports explicit human review and optional measurements.</p><p>This first verification foundation does not yet verify arbitrary agent tasks or prove that a pull request is correct. The Workspace runs locally and is not exposed by this landing.</p><a class="text-link" href="https://github.com/sovereis/REIVRO" target="_blank" rel="noopener noreferrer">Explore the repository <span aria-hidden="true">→</span><span class="sr-only"> (opens in a new tab)</span></a></div></article>
-      <article class="direction"><p class="eyebrow">PLANNED</p><h3>Where we're going</h3><p>Task verification, detection of incomplete results, learning from failures, reusable project rules and regression prevention: the REIVRO Rework Firewall direction. These capabilities are not yet an integrated product.</p><p><strong>PROTOTYPE:</strong> Regression Test Generator has documented upstream regression cases; it has no execution adapter in the current workflow. No productivity improvement has been measured or claimed.</p></article>
+      <article class="current"><div><p class="eyebrow">AVAILABLE · LOCAL MVP</p><h3>What works today</h3></div><div><p>Today's local MVP is the first step toward Rework Firewall. It analyzes public GitHub pull requests and grounds summary claims in traceable source excerpts. It checks cited excerpts against GitHub evidence, records execution results, and supports explicit human review and optional measurements.</p><p>Verification today covers the cited excerpts. Run the Workspace locally to try it.</p><a class="text-link" href="https://github.com/sovereis/REIVRO" target="_blank" rel="noopener noreferrer">Explore the repository <span aria-hidden="true">→</span><span class="sr-only"> (opens in a new tab)</span></a></div></article>
+      <article class="direction"><p class="eyebrow">PLANNED</p><h3>Where we're going</h3><p>The goal is to extend the PR evidence workflow to incomplete agent tasks and carry approved protections forward to future work.</p><p><strong>PROTOTYPE:</strong> Regression Test Generator has documented upstream regression cases; it has no execution adapter in the current workflow. No productivity improvement has been measured or claimed.</p></article>
       <section class="development-history" aria-labelledby="history-title">
         <div class="history-heading">
           <div>

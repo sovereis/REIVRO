@@ -35,7 +35,16 @@ test('responsive original hero, keyboard navigation, actual signup and failure s
   assert.ok(await page.getByRole('link', {name:'Skip to content'}).evaluate(node => node === document.activeElement));
   assert.equal(await page.locator('h1').innerText(), 'But they still get things wrong.');
   assert.match(await page.locator('.concept-demo').innerText(), /CONCEPTUAL EXAMPLE · NOT A PRODUCT EXECUTION/);
+  assert.match(await page.locator('.hero-note').innerText(), /say "done" while work is still missing/);
+  assert.match(await page.locator('.concept-demo').innerText(), /3 public references to the old domain/);
   assert.match(await page.locator('.direction').innerText(), /PLANNED/);
+  const publicLinks = await page.locator('a[href^="https://"]').evaluateAll(links => links.map(link => link.href));
+  assert.ok(publicLinks.includes('https://github.com/sovereis/REIVRO'));
+  for (const link of publicLinks) {
+    const url = new URL(link);
+    assert.equal(url.origin, 'https://github.com');
+    assert.match(url.pathname, /^\/sovereis\/REIVRO(?:\/|$)/);
+  }
   assert.match(await page.locator('.current').innerText(), /AVAILABLE · LOCAL MVP/);
   await page.locator('h1').click();
   for (const [width,height,label] of [[1440,1000,'desktop'],[1024,900,'small-desktop'],[768,1024,'tablet'],[390,844,'mobile']]) {

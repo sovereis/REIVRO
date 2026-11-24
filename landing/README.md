@@ -28,7 +28,11 @@ The runtime uses Python's standard library. It reuses the existing private-direc
 
 The hero image is preloaded and served locally. On desktop, requestAnimationFrame applies bounded scroll transforms to the artwork, ambient light and content. The artwork keeps the astronaut, Earth and stars together, with a separate ambient lighting plane providing the additional depth. There is no extracted character mesh. Desktop mouse movement adds at most three horizontal and two vertical pixels of microparallax. A metallic sheen moves across focused or hovered primary buttons. Scroll transforms and the sheen are disabled for reduced motion and widths below 1001 px. The UI includes a skip link, visible keyboard focus, field labels, inline errors, consent and live submission feedback.
 
-## Deploy to Vercel after approval
+## Deploy to the existing Vercel project
+
+Use the existing **reivro** project and production URL **https://reivrotools.vercel.app**. Preserve the production signup configuration. Deploy the tested commit from `feat/landing-page-v01` to Production and verify the public domain serves it.
+
+### Original provisioning reference
 
 The production target is **only `landing/`**. Vercel serves four allowlisted static files built into `public/`, with Python functions at `/api/config` and `/api/signup`. They import only `landing/backend`, independently of Workspace and the local preview server. Production uses Supabase Postgres over HTTPS through a restricted RPC called by the small `SupabaseStore.save` adapter. It never writes signup data to the function filesystem.
 
@@ -38,7 +42,7 @@ The production target is **only `landing/`**. Vercel serves four allowlisted sta
 
 | Variable | Value | Scope |
 | --- | --- | --- |
-| `SCOP_PUBLIC_ORIGIN` | Exact HTTPS origin, such as `https://scop.example.com`, without trailing slash or path | Configure separately per Preview/Production |
+| `SCOP_PUBLIC_ORIGIN` | Exact HTTPS origin, such as `https://reivrotools.vercel.app`, without trailing slash or path | Configure separately per Preview/Production |
 | `SCOP_SUPABASE_URL` | Project endpoint `https://<project-ref>.supabase.co` | Server only |
 | `SCOP_SUPABASE_PUBLISHABLE_KEY` | Low-privilege Supabase publishable key used by the server to reach the restricted RPC | Server variable |
 | `SCOP_SUPABASE_RPC_SECRET` | Independent random secret of at least 32 characters checked inside the signup RPC | Sensitive server-only variable |

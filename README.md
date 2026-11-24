@@ -4,7 +4,7 @@ REIVRO is being built to verify AI-generated development work, learn from failur
 
 **VERIFY → LEARN → PREVENT**
 
-AI coding agents can generate code, execute tasks, and report completion. Their claims do not always match the actual state of the repository. REIVRO aims to close that gap through evidence-based verification and reusable protections.
+AI coding agents can generate code, execute tasks, and report completion. A completion claim can hide missed requirements, unsupported conclusions or regressions that developers have to fix again. REIVRO aims to close that gap through evidence-based verification and reusable protections.
 
 ## Current MVP — AVAILABLE
 
