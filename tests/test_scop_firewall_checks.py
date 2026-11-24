@@ -132,14 +132,48 @@ def pg():
     return run
 
 
-def rpc(pg, actor, action, parameters, *, valid=True, role="authenticated"):
+def rpc(pg, actor, action, parameters, *, valid=True, role="authenticated", anonymous=False):
     # The fixture stands in for PostgREST after JWT validation. It supplies only
     # fixed test identities; neither SQL nor real user claims come from a webhook.
     payload = json.dumps(parameters, ensure_ascii=True).replace("'", "''")
     uid = actor or ""
     raw = pg(f"begin; set local role {role}; set local request.jwt.claim.sub = '{uid}'; "
+             f"set local request.jwt.claims = '{json.dumps({'is_anonymous': anonymous})}'; "
              f"select reivro_checks_api.dispatch('{action}', '{payload}'::jsonb); commit;", valid=valid)
     return json.loads(raw) if valid else raw
+
+
+def test_finish_report_matches_hosted_pr_contract(pg, monkeypatch):
+    rev = revision(90)
+    scope = {"repository_id": 101, "installation_id": 201}
+
+    def dispatch(method, url, headers, payload):
+        assert method == "POST"
+        assert url == "https://lbklqqqbmeyseeccdqog.supabase.co/rest/v1/rpc/dispatch"
+        assert headers["Content-Profile"] == "reivro_checks_api"
+        return rpc(pg, WORKER, payload["action"], payload["request"])
+
+    monkeypatch.setattr(checks, "_request", dispatch)
+    client = checks.StagingMemory("lbklqqqbmeyseeccdqog", "sb_publishable_fixture", "fixture-jwt")
+    claim_request = {
+        **scope, "repository": PROJECT.repository, "base_ref": "main", "delivery": str(uuid4()),
+        "pr": rev.pr, "base_sha": rev.base_sha, "head_sha": rev.head_sha,
+    }
+    assert "Denied" in rpc(pg, WORKER, "claim", claim_request, valid=False, anonymous=True)
+    claim = client.dispatch("claim", claim_request)
+    report = {"status": "PASS", "rule": "python-syntax-regression", "verifier_version": "verify-v2",
+              "repository": PROJECT.repository, "pr": rev.pr, "base_sha": rev.base_sha,
+              "head_sha": rev.head_sha, "compiler": "fixture",
+              "files": [{"status": "PASS", "file": "fixture.py"}]}
+    request = {**scope, "run_id": claim["run_id"], "report": report}
+    assert "Report identity does not match claim" in rpc(pg, WORKER, "finish", request, valid=False)
+
+    report["pr_url"] = "https://github.com/example/fixture/pull/91"
+    assert "Report identity does not match claim" in rpc(pg, WORKER, "finish", request, valid=False)
+
+    # GitHub's canonical repository casing may differ from the database key.
+    report["pr_url"] = "https://github.com/Example/Fixture/pull/90"
+    assert client.dispatch("finish", request) == {"run_id": claim["run_id"], "outcome": "OBSERVED"}
 
 
 def test_isolated_cloud_and_checks_lifecycle(pg, monkeypatch):
@@ -147,6 +181,12 @@ def test_isolated_cloud_and_checks_lifecycle(pg, monkeypatch):
     # VERIFY subprocess are real. No token, webhook or Check is sent to GitHub.
     scope = {"repository_id": 101, "installation_id": 201}
     trust = {}
+
+    def read_count(uid):
+        return int(pg(f"begin; set local role authenticated; set local request.jwt.claim.sub = '{uid}'; "
+                      "select count(*) from reivro_cloud.runs; commit;"))
+
+    initial_reviewer_runs = read_count(REVIEWER)
 
     class Memory:
         def dispatch(self, action, request):
@@ -262,11 +302,8 @@ def test_isolated_cloud_and_checks_lifecycle(pg, monkeypatch):
     assert "Denied" in rpc(pg, REVIEWER, "approve", approval, valid=False)
 
     # A role claim alone is not authority. Users see records only in their project.
-    def read_count(uid):
-        return pg(f"begin; set local role authenticated; set local request.jwt.claim.sub = '{uid}'; "
-                  "select count(*) from reivro_cloud.runs; commit;")
-    assert read_count(REVIEWER) == "6"
-    assert read_count(OTHER) == read_count(WORKER) == "0"
+    assert read_count(REVIEWER) == initial_reviewer_runs + 6
+    assert read_count(OTHER) == read_count(WORKER) == 0
     assert pg(f"begin; set local role authenticated; set local request.jwt.claim.sub = '{OTHER}'; "
               "select repository from reivro_cloud.projects; commit;") == "example/other"
     assert "permission denied" in pg("set role service_role; select * from reivro_cloud.runs;", valid=False)

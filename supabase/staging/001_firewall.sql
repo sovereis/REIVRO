@@ -115,7 +115,8 @@ declare
     row_item jsonb;
     reason text;
 begin
-    if who is null or coalesce(octet_length(request::text), 0) not between 2 and 524288
+    if who is null or auth.jwt()->>'is_anonymous' = 'true'
+        or coalesce(octet_length(request::text), 0) not between 2 and 524288
         or jsonb_typeof(request) is distinct from 'object'
         or action is null or action not in ('claim', 'finish', 'confirm', 'reject', 'propose', 'approve', 'revoke')
     then
@@ -176,6 +177,9 @@ begin
             report->>'head_sha' is distinct from run.head_sha or report->>'base_sha' is distinct from run.base_sha
             or lower(report->>'repository') is distinct from project.repository
             or report->>'pr' is distinct from run.pr::text
+            or lower(report->>'pr_url') is distinct from
+                ('https://github.com/' || project.repository || '/pull/' || run.pr)
+            or nullif(report->>'compiler','') is null
             or jsonb_typeof(report->'files') is distinct from 'array'
         ) then
             raise invalid_parameter_value using message = 'Report identity does not match claim';
@@ -196,15 +200,15 @@ begin
                     or not coalesce(starts_with(lower(row_item->>'head_file_url'),
                         'https://github.com/' || project.repository || '/blob/' || run.head_sha || '/'), false)
                     or not coalesce(starts_with(lower(row_item->>'base_file_url'),
-                        'https://github.com/' || project.repository || '/blob/' || run.base_sha || '/'), false)
-                    or nullif(report->>'compiler','') is null then
+                        'https://github.com/' || project.repository || '/blob/' || run.base_sha || '/'), false) then
                     raise invalid_parameter_value using message = 'Incomplete finding evidence';
                 end if;
                 insert into reivro_cloud.findings(project_id, run_id, evidence)
                     values (project.id, run.id, row_item);
             end loop;
         elsif result = 'PASS' and (jsonb_array_length(report->'files') = 0 or exists (
-            select from jsonb_array_elements(report->'files') e where e->>'status' is distinct from 'PASS'
+            select from jsonb_array_elements(report->'files') e
+             where e->>'status' is distinct from 'PASS' or coalesce(e->>'file', '') !~ '[.]py$'
         )) then
             raise invalid_parameter_value using message = 'Inconsistent PASS';
         end if;
