@@ -1,10 +1,10 @@
 # Workspace integration v0.6
 
-The Workspace boundary consumes one UTF-8 JSON request and returns one structured workflow result. It invokes [SCOP Workflow v0.5](WORKFLOW.md) in-process, preserving its Core skill selection, summary generation, evidence checks, and execution records.
+The Workspace boundary consumes one UTF-8 JSON request and returns one structured workflow result. It invokes [REIVRO Workflow v0.5](WORKFLOW.md) in-process, preserving its Core skill selection, summary generation, evidence checks, and execution records.
 
 ## Local example
 
-Use Python 3.12 from a trusted SCOP checkout. Ask the caller to approve read-only access to public GitHub PR metadata and diffs before including the permission. Omitting the permission blocks external access.
+Use Python 3.12 from a trusted REIVRO checkout. Ask the caller to approve read-only access to public GitHub PR metadata and diffs before including the permission. Omitting the permission blocks external access.
 
 ```sh
 python -B -m server.scop_workspace <<'JSON'

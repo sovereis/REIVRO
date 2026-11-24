@@ -1,4 +1,4 @@
-# SCOP GitHub Evidence Adapter v0.3 — proposed PR #7
+# REIVRO GitHub Evidence Adapter v0.3 — proposed PR #7
 
 This optional workflow checks **an existing PR-summary record** against GitHub's current PR metadata, body and diff. It does not generate a new summary or prove that the natural-language claims are semantically correct.
 

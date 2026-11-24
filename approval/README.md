@@ -1,7 +1,7 @@
 
-# SCOP Approval
+# REIVRO Approval
 
-Validation, review, and approval processes for the SCOP AI ecosystem.
+Validation, review, and approval processes for REIVRO verification and protection workflows.
 
 ## Purpose
 - Validate skills before release.

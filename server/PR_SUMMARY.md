@@ -7,7 +7,7 @@ python -B -m server.scop_pr_summary https://github.com/pallets/flask/pull/5808 \
   --permission github:read-pr-evidence
 ```
 
-Without the exact permission grant, the command exits 2 before contacting GitHub. Use a trusted SCOP checkout. The CLI issues unauthenticated GETs to the fixed GitHub API with redirects disabled. It does not execute PR content or write to the repository.
+Without the exact permission grant, the command exits 2 before contacting GitHub. Use a trusted REIVRO checkout. The CLI issues unauthenticated GETs to the fixed GitHub API with redirects disabled. It does not execute PR content or write to the repository.
 
 ## Evidence and coverage
 

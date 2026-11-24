@@ -1,6 +1,6 @@
-# SCOP Core v0.1 — skill discovery and matching
+# REIVRO Core v0.1 — skill discovery and matching
 
-This is the smallest working component of the SCOP orchestration engine. It reads `SKILL.md` frontmatter from immediate subfolders under `skills/` and ranks installed skills for an English task using **deterministic keyword matching**. It does not run an AI model, fetch pull requests, execute skills, write files, or modify repositories.
+This is the smallest working component of the REIVRO orchestration engine. It reads `SKILL.md` frontmatter from immediate subfolders under `skills/` and ranks installed skills for an English task using **deterministic keyword matching**. It does not run an AI model, fetch pull requests, execute skills, write files, or modify repositories.
 
 ## Usage (from repository root)
 

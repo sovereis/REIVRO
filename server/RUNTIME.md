@@ -1,10 +1,10 @@
-# SCOP Runtime v0.2
+# REIVRO Runtime v0.2
 
 The first workflow audits one existing PR-summary JSON record. It checks the record against the existing Pull Request Summary validator and reports the number of claims and source references checked. Run it before handing a summary to a reviewer.
 
 ## Run an audit
 
-From the SCOP repository root, with Python 3.12, run:
+From the REIVRO repository root, with Python 3.12, run:
 
 ```sh
 python -B -m server.scop_runtime "audit a GitHub pull request summary" \
@@ -26,9 +26,9 @@ Argument parsing errors are reported separately by the CLI on stderr. Task resul
 
 ## Execution boundary
 
-The Python API accepts a `TaskRequest` and a binary input stream. It checks permissions before discovery or input reads. Core ranks installed skill metadata using lexical matching. Only a unique top match for Pull Request Summary can reach the hard-coded adapter. The adapter calls the existing validator's per-record function from the trusted SCOP checkout. The Markdown definition and supplied record are data. Neither can select a command, validator path, network endpoint, or permission.
+The Python API accepts a `TaskRequest` and a binary input stream. It checks permissions before discovery or input reads. Core ranks installed skill metadata using lexical matching. Only a unique top match for Pull Request Summary can reach the hard-coded adapter. The adapter calls the existing validator's per-record function from the trusted REIVRO checkout. The Markdown definition and supplied record are data. Neither can select a command, validator path, network endpoint, or permission.
 
-The policy controls what this runtime invokes. It does not sandbox Python or an installation whose source files are writable by untrusted actors. Use a trusted SCOP checkout. Task input and command-line arguments are supplied by the local caller.
+The policy controls what this runtime invokes. It does not sandbox Python or an installation whose source files are writable by untrusted actors. Use a trusted REIVRO checkout. Task input and command-line arguments are supplied by the local caller.
 
 ## Verify
 

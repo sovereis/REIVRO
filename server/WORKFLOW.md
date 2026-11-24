@@ -1,4 +1,4 @@
-# SCOP Workflow Integration v0.5
+# REIVRO Workflow Integration v0.5
 
 Generate a reviewable summary from a public PR URL using the existing Core selector, PR Summary generator, schema validator, and GitHub evidence matcher. The workflow returns a UUID, overall status, duration in milliseconds, lifecycle events, step records, and the verified summary with citation counts.
 
@@ -7,7 +7,7 @@ python -B -m server.scop_workflow https://github.com/pallets/flask/pull/5808 \
   --permission github:read-pr-evidence
 ```
 
-Run from a trusted SCOP checkout with Python 3.12. The permission is opt-in and must be the only grant. The CLI uses unauthenticated GETs to the fixed GitHub API. It refuses redirects and never executes PR content, modifies repositories, or merges PRs.
+Run from a trusted REIVRO checkout with Python 3.12. The permission is opt-in and must be the only grant. The CLI uses unauthenticated GETs to the fixed GitHub API. It refuses redirects and never executes PR content, modifies repositories, or merges PRs.
 
 | Step | Requires | Action |
 | --- | --- | --- |

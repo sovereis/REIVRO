@@ -1,4 +1,4 @@
-# SCOP skill development status
+# REIVRO skill development status
 
 The [catalog](CATALOG.md) records a skill's current development stage. Use the evidence below to propose a status change in a repository review.
 

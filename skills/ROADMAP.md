@@ -1,4 +1,4 @@
-# SCOP implementation roadmap
+# REIVRO implementation roadmap
 
 This proposal prioritizes workflows with immediate customer value and repeatable evidence. Start with read-only sources and fixtures. Add account connectors, persistent state, and actions after their permission and failure behavior can be tested. Customer value estimates are assumptions for prioritization. The [catalog](CATALOG.md) lists suggested dependencies and integrations, and the [status guide](STATUS.md) defines advancement evidence.
 

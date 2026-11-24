@@ -45,6 +45,11 @@ def post(server, payload, route='/api/run', headers=None, raw=None):
     response = conn.getresponse()
     status, body = response.status, json.loads(response.read())
     conn.close()
+    # A response can arrive before the handler releases its operation lock.
+    # Wait for cleanup before the next sequential request, except on a busy reply.
+    if status != 409:
+        assert server.operation_lock.acquire(timeout=5)
+        server.operation_lock.release()
     return status, body
 
 
