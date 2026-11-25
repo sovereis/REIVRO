@@ -1,0 +1,282 @@
+"""Operator-approved static task verification against immutable Git objects."""
+import argparse
+from hashlib import sha256
+import json
+import os
+import re
+from selectors import DefaultSelector, EVENT_READ
+import subprocess
+import sys
+from time import monotonic
+
+from .scop_agent_integration import SHA, read_json, validate, uuid_text
+from .scop_firewall_checks import StagingMemory
+from .scop_firewall_memory import Memory, identifier, project_key
+from .scop_firewall_pilot import STAGING
+
+RULE = "task-completion-v1"
+DIGEST = re.compile(r"[0-9a-f]{64}")
+PATH = re.compile(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*")
+LIMIT = 256 * 1024
+
+
+def valid_path(value):
+    return (isinstance(value, str) and len(value) <= 240 and PATH.fullmatch(value)
+            and not {".", "..", ".git"}.intersection(part.lower() for part in value.split("/")))
+
+
+def task_contract(item):
+    fields = {"version", "task_id", "project", "base_sha", "objective", "allowed_paths",
+              "protected_paths", "criteria"}
+    if (not isinstance(item, dict) or set(item) != fields or type(item["version"]) is not int
+            or item["version"] != 1):
+        raise ValueError("Invalid task contract")
+    uuid_text(item["task_id"])
+    if (not isinstance(item["base_sha"], str) or not SHA.fullmatch(item["base_sha"])
+            or not isinstance(item["objective"], str) or not item["objective"].strip()
+            or len(item["objective"]) > 2048):
+        raise ValueError("Invalid task objective or BASE")
+    for name in ("allowed_paths", "protected_paths"):
+        paths = item[name]
+        if (not isinstance(paths, list) or len(paths) > 128 or not all(map(valid_path, paths))
+                or len(set(paths)) != len(paths)):
+            raise ValueError("Invalid path scope")
+    criteria = item["criteria"]
+    if not isinstance(criteria, list) or not 0 < len(criteria) <= 32:
+        raise ValueError("Expected bounded acceptance criteria")
+    for criterion in criteria:
+        if not isinstance(criterion, dict):
+            raise ValueError("Invalid criterion")
+        kind = criterion.get("kind")
+        if kind in ("exists", "changed") and set(criterion) == {"kind", "path"}:
+            if valid_path(criterion["path"]):
+                continue
+        if kind == "blob_sha256" and set(criterion) == {"kind", "path", "digest"}:
+            if valid_path(criterion["path"]) and isinstance(criterion["digest"], str) and DIGEST.fullmatch(criterion["digest"]):
+                continue
+        if kind == "manual" and set(criterion) == {"kind"}:
+            continue
+        if kind == "cloud_run" and set(criterion) == {"kind", "repository_id", "run_id", "outcome"}:
+            uuid_text(criterion["run_id"])
+            if (type(criterion["repository_id"]) is int and 0 < criterion["repository_id"] < 2**63
+                    and criterion["outcome"] in ("PASS", "OBSERVED")):
+                continue
+        raise ValueError("Unsupported or malformed criterion")
+    return {**item, "project": project_key(item["project"])}
+
+
+class GitUnavailable(Exception):
+    pass
+
+
+class GitObjects:
+    """Read a trusted operator checkout with a fixed binary and no shell."""
+
+    def __init__(self, checkout):
+        self.checkout = checkout
+
+    def read(self, *args, limit=LIMIT):
+        deadline = monotonic() + 5
+        with subprocess.Popen(
+            ["/usr/bin/git", "--no-replace-objects", "-C", self.checkout, *args],
+            env={"PATH": os.defpath, "LC_ALL": "C", "GIT_CONFIG_NOSYSTEM": "1",
+                 "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_LITERAL_PATHSPECS": "1",
+                 "GIT_NO_LAZY_FETCH": "1", "GIT_ALLOW_PROTOCOL": "",
+                 "GIT_OPTIONAL_LOCKS": "0", "GIT_TERMINAL_PROMPT": "0"},
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        ) as proc, DefaultSelector() as selector:
+            selector.register(proc.stdout, EVENT_READ)
+            data = bytearray()
+            try:
+                while selector.select(max(0, deadline - monotonic())):
+                    if monotonic() >= deadline:
+                        raise GitUnavailable
+                    chunk = os.read(proc.stdout.fileno(), min(65536, limit + 1 - len(data)))
+                    if not chunk:
+                        if proc.wait(timeout=max(0, deadline - monotonic())) != 0:
+                            raise GitUnavailable
+                        return bytes(data)
+                    data.extend(chunk)
+                    if len(data) > limit:
+                        raise GitUnavailable
+                raise GitUnavailable
+            except subprocess.TimeoutExpired:
+                raise GitUnavailable from None
+            finally:
+                if proc.poll() is None:
+                    proc.kill()
+
+    def head(self):
+        return self.read("rev-parse", "--verify", "HEAD^{commit}", limit=64).decode("ascii").strip()
+
+    def blob(self, head, path, *, digest=False):
+        entry = self.read("ls-tree", "-z", head, "--", path, limit=512)
+        if not entry:
+            return False
+        metadata, name = entry.rstrip(b"\0").split(b"\t", 1)
+        mode, kind, oid = metadata.split()
+        if kind != b"blob" or mode not in {b"100644", b"100755"} or name != path.encode():
+            return False
+        if not digest:
+            return True
+        return sha256(self.read("cat-file", "blob", oid.decode("ascii"))).hexdigest()
+
+
+def subject(task_id):
+    return "task-contract-" + task_id
+
+
+def approve(memory, contract, git):
+    contract = task_contract(contract)
+    if memory.repository != contract["project"] or git.head() != contract["base_sha"]:
+        raise ValueError("Expected trusted project at the approved BASE")
+    digest = identifier("task", contract)
+    with memory.transaction(write=True) as db:
+        if memory.history(db, subject(contract["task_id"])):
+            raise ValueError("Task contract already has a decision")
+        memory.append(db, "task_approved", subject(contract["task_id"]),
+                      {"digest": digest, "contract": contract})
+    return {"status": "APPROVED", "task_id": contract["task_id"], "digest": digest}
+
+
+def active_contract(memory, db, task_id, digest):
+    events = memory.history(db, subject(task_id))
+    if not events or events[-1]["kind"] != "task_approved":
+        raise ValueError("Task has no active operator approval")
+    stored = events[0]["data"]
+    contract = task_contract(stored["contract"])
+    if digest != stored["digest"] or digest != identifier("task", contract):
+        raise ValueError("Approved contract digest mismatch")
+    return contract
+
+
+def revoke(memory, task_id, digest):
+    with memory.transaction(write=True) as db:
+        active_contract(memory, db, task_id, digest)
+        memory.append(db, "task_revoked", subject(task_id), {"digest": digest})
+    return {"status": "REVOKED", "task_id": task_id, "digest": digest}
+
+
+def cloud_evidence(criterion, contract, head, env):
+    if env.get("REIVRO_STAGING_REF") != STAGING:
+        return None
+    try:
+        memory = StagingMemory(STAGING, env["REIVRO_PUBLISHABLE_KEY"], env["REIVRO_AGENT_READER_JWT"])
+        record = memory.read_run(criterion["repository_id"], criterion["run_id"])
+        if record is None:
+            return None
+        run = record["run"]
+        report = run.get("report") or {}
+        return (run.get("id") == criterion["run_id"] and run.get("head_sha") == head
+                and run.get("base_sha") == contract["base_sha"] and run.get("outcome") == criterion["outcome"]
+                and str(report.get("repository", "")).lower() == contract["project"]
+                and report.get("head_sha") == head and report.get("base_sha") == contract["base_sha"]
+                and report.get("verification_status", report.get("status")) == "PASS")
+    except Exception:
+        return None
+
+
+def inspect(contract, git, head, env):
+    if git.head() != head:
+        return {"status": "INCONCLUSIVE", "reason": "head_mismatch"}
+    base = contract["base_sha"]
+    try:
+        git.read("merge-base", "--is-ancestor", base, head, limit=0)
+    except GitUnavailable:
+        return {"status": "INCONCLUSIVE", "reason": "base_ancestry_unconfirmed"}
+    paths = set(git.read("diff-tree", "--no-commit-id", "--name-only", "--no-renames",
+                         "--no-ext-diff", "--no-textconv", "-r", "-z", base, head).split(b"\0")) - {b""}
+    allowed = {path.encode() for path in contract["allowed_paths"]}
+    protected = {path.encode() for path in contract["protected_paths"]}
+    violations = [{"path_sha256": sha256(path).hexdigest(),
+                   "reason": "protected_path" if path in protected else "out_of_scope"}
+                  for path in sorted((paths - allowed) | (paths & protected))]
+    criteria = []
+    for index, criterion in enumerate(contract["criteria"]):
+        kind = criterion["kind"]
+        if kind == "manual":
+            observed = None
+        elif kind == "cloud_run":
+            observed = cloud_evidence(criterion, contract, head, env)
+        else:
+            path = criterion["path"]
+            if kind == "changed":
+                observed = False
+                if path.encode() in paths:
+                    current = git.blob(head, path, digest=True)
+                    observed = bool(current) and current != git.blob(base, path, digest=True)
+            elif kind == "exists":
+                observed = git.blob(head, path) is True
+            else:
+                observed = git.blob(head, path, digest=True) == criterion["digest"]
+        criteria.append({"index": index, "kind": kind,
+                         "outcome": {True: "met", False: "unmet", None: "unverified"}[observed]})
+    if git.head() != head:
+        return {"status": "INCONCLUSIVE", "reason": "head_moved"}
+    outcomes = {criterion["outcome"] for criterion in criteria}
+    status = ("POLICY_VIOLATION" if violations else "INCOMPLETE" if "unmet" in outcomes else
+              "INCONCLUSIVE" if "unverified" in outcomes else "VERIFIED")
+    return {"status": status, "base_sha": base, "observed_head_sha": head,
+            "criteria": criteria, "violations": violations}
+
+
+def verify(memory, submission, digest, git, env):
+    item = validate(submission)
+    if item["project"] != memory.repository:
+        raise ValueError("Submission project mismatch")
+    event = "task-event-" + item["event_id"]
+    fingerprint = identifier("submission", [item, digest])
+    with memory.transaction() as db:
+        contract = active_contract(memory, db, item["task_id"], digest)
+        prior = memory.history(db, event)
+    if not prior:
+        try:
+            result = inspect(contract, git, item["head_sha"], env)
+        except (GitUnavailable, OSError, ValueError):
+            result = {"status": "ERROR", "reason": "git_evidence_unavailable"}
+    with memory.transaction(write=True) as db:
+        active_contract(memory, db, item["task_id"], digest)
+        prior = memory.history(db, event)
+        if prior:
+            if prior[0]["data"]["fingerprint"] != fingerprint:
+                raise ValueError("Conflicting task event")
+            return {"status": "INCONCLUSIVE", "reason": "duplicate_event"}
+        report = {"version": 1, "rule": RULE, "task_id": item["task_id"], "event_id": item["event_id"],
+                  "project": item["project"], "requested_head_sha": item["head_sha"],
+                  "contract_digest": digest, "agent_declaration": {"agent": item["agent"], "complete": True},
+                  **result}
+        report["evidence_id"] = identifier("task-evidence", report)
+        memory.append(db, "task_verified", event, {"fingerprint": fingerprint, "report": report})
+        return report
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--repository", required=True)
+    parser.add_argument("--store", required=True)
+    actions = parser.add_subparsers(dest="action", required=True)
+    actions.add_parser("approve").add_argument("--checkout", required=True)
+    check = actions.add_parser("verify")
+    check.add_argument("--checkout", required=True)
+    check.add_argument("--digest", required=True)
+    disable = actions.add_parser("revoke")
+    disable.add_argument("--task-id", required=True)
+    disable.add_argument("--digest", required=True)
+    args = parser.parse_args()
+    try:
+        memory = Memory(args.store, args.repository)
+        if args.action == "approve":
+            result = approve(memory, read_json(32768), GitObjects(args.checkout))
+        elif args.action == "revoke":
+            result = revoke(memory, uuid_text(args.task_id), args.digest)
+        else:
+            result = verify(memory, read_json(4096), args.digest, GitObjects(args.checkout), os.environ)
+    except Exception:
+        result = {"status": "ERROR", "reason": "task_contract_or_evidence_rejected"}
+    print(json.dumps(result, ensure_ascii=True))
+    return {"APPROVED": 0, "REVOKED": 0, "VERIFIED": 0, "INCOMPLETE": 2,
+            "POLICY_VIOLATION": 2}.get(result["status"], 1)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
