@@ -69,13 +69,16 @@ class Firewall:
                         "reason": "Verified HEAD differs from requested revision"}}
         return analysis
 
-    def analyze(self, url, permission, *, expected_head=None):
+    def analyze(self, url, permission, *, expected_head=None, on_record=None):
         pr = self._check_pr(url, permission)
         with self.memory.transaction():
             pass
         analysis = self._pin(self._verify(url, pr), expected_head)
         with self.memory.transaction(write=True) as db:
-            return self._record_analysis(db, analysis)
+            result = self._record_analysis(db, analysis)
+            if on_record is not None:
+                on_record(db, result)
+            return result
 
     def _record_analysis(self, db, analysis):
         report = analysis["report"]
@@ -216,22 +219,22 @@ class Firewall:
             self.memory.append(db, "protection_exported", protection_id, {"version": manifest["version"]})
             return {"path": path, "protection_id": protection_id}
 
-    def run(self, protection_id, checkout, url, permission, *, expected_head=None):
+    def run(self, protection_id, checkout, url, permission, *, expected_head=None, on_record=None):
         pr = self._check_pr(url, permission)
         run_id = "r-" + uuid4().hex
         with self.memory.transaction(write=True) as db:
             manifest = self._active(db, protection_id)
             if manifest is None:
                 result = {"status": "INAPPLICABLE", "reason": "Protection is inactive or unsupported"}
-                return self._record_run(db, run_id, protection_id, url, result)
+                return self._record_run(db, run_id, protection_id, url, result, on_record)
             try:
                 exported = artifact(checkout, protection_id)
             except (OSError, FirewallError):
                 result = {"status": "ERROR", "reason": "Cannot read the protection artifact safely"}
-                return self._record_run(db, run_id, protection_id, url, result)
+                return self._record_run(db, run_id, protection_id, url, result, on_record)
             if exported != canonical(manifest) + b"\n":
                 result = {"status": "ERROR", "reason": "Artifact does not match the approved protection version"}
-                return self._record_run(db, run_id, protection_id, url, result)
+                return self._record_run(db, run_id, protection_id, url, result, on_record)
             self.memory.append(db, "protection_run_started", run_id, {
                 "protection_id": protection_id, "pr_url": url, "version": PROTECTION_VERSION,
             })
@@ -243,7 +246,7 @@ class Firewall:
                 return self._record_run(db, run_id, protection_id, url, {
                     "status": "ERROR", "reason": "Protection run interrupted",
                     "version": PROTECTION_VERSION,
-                })
+                }, on_record)
         report = analysis["report"]
         head = report.get("head_sha")
         with self.memory.transaction(write=True) as db:
@@ -262,7 +265,7 @@ class Firewall:
                     "REGRESSION_DETECTED": "VIOLATION_DETECTED", "PASS": "NO_VIOLATION",
                     "INCONCLUSIVE": "INCONCLUSIVE", "ERROR": "ERROR",
                 }[report["status"]]
-            return self._record_run(db, run_id, protection_id, url, result)
+            return self._record_run(db, run_id, protection_id, url, result, on_record)
 
     @staticmethod
     def _artifact_matches(checkout, protection_id, manifest):
@@ -271,9 +274,11 @@ class Firewall:
         except (OSError, FirewallError):
             return False
 
-    def _record_run(self, db, run_id, protection_id, url, result):
+    def _record_run(self, db, run_id, protection_id, url, result, on_record=None):
         entry = {"run_id": run_id, "protection_id": protection_id, "pr_url": url, **result}
         self.memory.append(db, "protection_run_finished", run_id, entry)
+        if on_record is not None:
+            on_record(db, entry)
         return entry
 
     def history(self, subject=None):

@@ -7,6 +7,8 @@ import re
 import sys
 from uuid import UUID
 
+from .scop_agent_feedback import (MAX_REPORT, checked_feedback, link_correction,
+                                  record_report, recorded_report, review_lock)
 from .scop_firewall import Firewall
 from .scop_firewall_checks import StagingMemory
 from .scop_firewall_memory import Memory, identifier, project_key
@@ -75,23 +77,30 @@ def public_result(item, status, *, report=None, finding_ids=(), protection=None,
             "modified_files": files, "findings": list(finding_ids), "protection": protection}
 
 
-def local_result(firewall, item, *, protection=None, checkout=None):
+def local_result(firewall, item, *, protection, checkout, commit):
     url = f"https://github.com/{item['project']}/pull/{item['pr']}"
+
+    def record(db, outcome):
+        if protection is None:
+            analysis = outcome
+            result = analysis["report"]["status"]
+            applied = None
+        else:
+            result = outcome["status"]
+            applied = {"id": protection, "application": {
+                "VIOLATION_DETECTED": "violation", "NO_VIOLATION": "checked",
+                "INAPPLICABLE": "inactive",
+            }.get(result, "unconfirmed")}
+            analysis = (firewall.memory.history(db, outcome["analysis_id"])[0]["data"]
+                        if "analysis_id" in outcome else {})
+        ids = [value for value in analysis.get("finding_ids", ()) if FINDING.fullmatch(value)]
+        commit(db, public_result(item, result, report=analysis.get("report"), finding_ids=ids,
+                                 protection=applied, evidence_kind="verified_public_pr"))
+
     if protection is None:
-        analysis = firewall.analyze(url, True, expected_head=item["head_sha"])
-        result = analysis["report"]["status"]
-        applied = None
+        firewall.analyze(url, True, expected_head=item["head_sha"], on_record=record)
     else:
-        run = firewall.run(protection, checkout, url, True, expected_head=item["head_sha"])
-        result = run["status"]
-        applied = {"id": protection, "application": {
-            "VIOLATION_DETECTED": "violation", "NO_VIOLATION": "checked",
-            "INAPPLICABLE": "inactive",
-        }.get(result, "unconfirmed")}
-        analysis = (firewall.history(run["analysis_id"])[0]["data"] if "analysis_id" in run else {})
-    ids = [value for value in analysis.get("finding_ids", ()) if FINDING.fullmatch(value)]
-    return public_result(item, result, report=analysis.get("report"), finding_ids=ids,
-                         protection=applied, evidence_kind="verified_public_pr")
+        firewall.run(protection, checkout, url, True, expected_head=item["head_sha"], on_record=record)
 
 
 def cloud_result(item, ref, repository_id, run_id, env):
@@ -126,27 +135,51 @@ def review(item, args, env):
         raise ValueError("Unexpected project")
     memory = Memory(args.store, args.repository)
     subject = "agent-event-" + item["event_id"]
-    fingerprint = identifier("submission", [item, args.cloud_run, args.repository_id, args.protection])
-    with memory.transaction(write=True) as db:
-        prior = memory.history(db, subject)
-        if prior:
-            if prior[0]["data"]["fingerprint"] != fingerprint:
-                raise ValueError("Conflicting event")
-            # The caller must not mistake a cached result for a fresh protection check.
-            return public_result(item, "INCONCLUSIVE") | {"reason": "duplicate_event"}
-        memory.append(db, "agent_submission", subject, {"fingerprint": fingerprint})
-    try:
-        if args.cloud_run:
-            result = cloud_result(item, env["REIVRO_STAGING_REF"], args.repository_id,
-                                  args.cloud_run, env)
-        else:
-            result = local_result(Firewall(memory), item,
-                                  protection=args.protection, checkout=args.checkout)
-    except Exception:
-        result = public_result(item, "ERROR") | {"reason": "integration_failed"}
-    with memory.transaction(write=True) as db:
-        memory.append(db, "agent_result", subject, {"status": result["status"]})
-    return result
+    parent = getattr(args, "after_correction", None)
+    identity = [item, args.cloud_run, args.repository_id, args.protection]
+    if parent is not None:
+        identity.append(uuid_text(parent))
+    fingerprint = identifier("submission", identity)
+    with review_lock(memory):
+        with memory.transaction(write=True) as db:
+            prior = memory.history(db, subject)
+            if prior:
+                if prior[0]["data"]["fingerprint"] != fingerprint:
+                    raise ValueError("Conflicting event")
+                if any(event["kind"] == "agent_result" for event in prior):
+                    return public_result(item, "INCONCLUSIVE") | {"reason": "duplicate_event"}
+                if prior[0]["data"].get("journal") != 2:
+                    return public_result(item, "INCONCLUSIVE") | {"reason": "legacy_reservation"}
+            else:
+                if parent is not None:
+                    link_correction(memory, db, item, parent, args.protection)
+                memory.append(db, "agent_submission", subject, {"fingerprint": fingerprint, "journal": 2})
+
+        def commit(db, result):
+            record_report(memory, db, subject, result)
+
+        try:
+            if args.cloud_run:
+                result = cloud_result(item, env["REIVRO_STAGING_REF"], args.repository_id,
+                                      args.cloud_run, env)
+                with memory.transaction(write=True) as db:
+                    commit(db, result)
+            else:
+                local_result(Firewall(memory), item, protection=args.protection,
+                             checkout=args.checkout, commit=commit)
+        except Exception:
+            with memory.transaction(write=True) as db:
+                if recorded_report(memory, db, subject) is None:
+                    commit(db, public_result(item, "ERROR") | {"reason": "integration_failed"})
+        with memory.transaction() as db:
+            return recorded_report(memory, db, subject)
+
+
+def read_json(limit):
+    raw = sys.stdin.buffer.read(limit + 1)
+    if len(raw) > limit:
+        raise ValueError("Oversized input")
+    return json.loads(raw, object_pairs_hook=unique_object)
 
 
 def main():
@@ -167,11 +200,28 @@ def main():
     action.add_argument("--checkout")
     action.add_argument("--cloud-run")
     action.add_argument("--repository-id", type=int)
+    action.add_argument("--after-correction")
+    for name in ("feedback", "authorize-correction"):
+        decision = commands.add_parser(name)
+        decision.add_argument("--repository", required=True)
+        decision.add_argument("--store", required=True)
+        decision.add_argument("--event-id", required=True)
+        if name == "feedback":
+            decision.add_argument("--recover", action="store_true")
     args = parser.parse_args()
     try:
         if args.command == "submit":
             result = validate({k: getattr(args, k) for k in FIELDS - {"version"}} | {"version": 1})
+        elif args.command in {"feedback", "authorize-correction"}:
+            recover = getattr(args, "recover", False)
+            report = None if recover else read_json(MAX_REPORT)
+            if not recover and not isinstance(report, dict):
+                raise ValueError("Expected a feedback report")
+            result = checked_feedback(Memory(args.store, args.repository), report,
+                                      uuid_text(args.event_id), authorize=args.command == "authorize-correction")
         else:
+            if args.after_correction and (args.cloud_run or not args.protection):
+                raise ValueError("A correction requires a local protection")
             if args.cloud_run:
                 if not args.repository_id or args.protection or args.checkout or args.github_read:
                     raise ValueError("Expected trusted repository ID and cloud run")
@@ -179,10 +229,7 @@ def main():
                 raise ValueError("Expected explicit read authorization and paired protection/checkout")
             if args.protection and not re.fullmatch(r"p-[0-9a-f]{64}", args.protection):
                 raise ValueError("Invalid protection ID")
-            raw = sys.stdin.buffer.read(MAX_REQUEST + 1)
-            if len(raw) > MAX_REQUEST:
-                raise ValueError("Oversized input")
-            result = review(json.loads(raw, object_pairs_hook=unique_object), args, os.environ)
+            result = review(read_json(MAX_REQUEST), args, os.environ)
     except Exception:
         result = {"version": 1, "status": "ERROR", "reason": "request_or_integration_failed"}
     print(json.dumps(result, ensure_ascii=True, allow_nan=False))
