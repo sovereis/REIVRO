@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Disposable PostgreSQL only. Does not use remote DB URLs or Supabase credentials.
 set -euo pipefail
+control_plane=0
+if [[ "${1:-}" == "--control-plane" && $# == 1 ]]; then
+    control_plane=1
+    shift
+fi
 if (( $# != 0 )) && [[ "${1:-}" != "--benchmark" && "${1:-}" != "--benchmark-v2" || $# != 2 || -z "$2" ]]; then
   echo "Usage: $0 [--benchmark|--benchmark-v2 OUTPUT_DIRECTORY]" >&2
   exit 2
@@ -40,6 +45,9 @@ insert into auth.users values
 SQL
 psql < supabase/staging/001_firewall.sql
 bash ops/vercel-pilot/staging/manage.sh render-002 | psql
+if (( control_plane )); then
+    psql < supabase/staging/003_control_plane.sql
+fi
 psql <<'SQL'
 insert into reivro_cloud.projects (id,repository_id,repository,installation_id,trusted_base) values
     ('10000000-0000-0000-0000-000000000001',101,'example/fixture',201,'main'),
@@ -69,6 +77,8 @@ if (( $# == 2 )); then
     if [[ "$1" == "--benchmark-v2" ]]; then version=2; fi
     REIVRO_BENCHMARK_VERSION="$version" REIVRO_BENCHMARK_OUTPUT="$output" REIVRO_LOCAL_TEST_POSTGRES="$name"         PYTHONDONTWRITEBYTECODE=1 "${PYTHON:-python}" -m pytest -q tests/test_scop_effectiveness_benchmark.py -k effectiveness_benchmark
 else
+    extra_tests=()
+    if (( control_plane )); then extra_tests+=(tests/test_scop_control_plane.py); fi
     REIVRO_LOCAL_TEST_POSTGRES="$name" PYTHONDONTWRITEBYTECODE=1 "${PYTHON:-python}" \
-    -m pytest -q tests/test_scop_firewall_checks.py tests/test_scop_firewall_recovery.py
+    -m pytest -q tests/test_scop_firewall_checks.py tests/test_scop_firewall_recovery.py "${extra_tests[@]}"
 fi
