@@ -90,7 +90,8 @@ def test_real_sdk_producer_contract_at_network_boundary(monkeypatch):
     body, signature, key, _ = delivery(1)
     sent = []
 
-    async def send(topic, item, *, idempotency_key):
+    async def send(topic, item, *, idempotency_key, retention):
+        assert retention == 3600
         sent.append((topic, item, idempotency_key))
         if len(sent) == 2:
             raise queue.DuplicateIdempotencyKeyError("duplicate")

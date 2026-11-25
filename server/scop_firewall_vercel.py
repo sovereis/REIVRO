@@ -66,7 +66,7 @@ async def publish(key, body, signature):
     item = {"delivery": key, "body": base64.b64encode(body).decode("ascii"), "signature": signature}
     try:
         async with asyncio.timeout(10):
-            message_id = await send(TOPIC, item, idempotency_key=key)
+            message_id = await send(TOPIC, item, idempotency_key=key, retention=3600)
     except DuplicateIdempotencyKeyError:
         return
     if not message_id:
