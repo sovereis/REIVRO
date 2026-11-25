@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "consent_to_local_recording": false,
+  "installation_seconds": null,
+  "first_verification_seconds": null,
+  "configuration_difficulties": [],
+  "report_clarity_1_to_5": null,
+  "confirmed_recurrences": null,
+  "correction_seconds": null,
+  "suspected_false_positives": null,
+  "sanitized_notes": ""
+}
