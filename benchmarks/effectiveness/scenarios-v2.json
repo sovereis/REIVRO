@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "seed": null,
+  "repetitions": 3,
+  "scenarios": [
+    {"id":"seed","pr":401,"head":"value = )","fault":"none","truth":true,"recurrence":false,"expected":["ACCEPTED","REGRESSION_DETECTED","OBSERVED"]},
+    {"id":"active_regression","pr":402,"head":"value = ]","fault":"approve","truth":true,"recurrence":true,"expected":["ACCEPTED","REGRESSION_DETECTED","VIOLATION"]},
+    {"id":"active_clean","pr":403,"head":"value = 3","fault":"none","truth":false,"recurrence":false,"expected":["ACCEPTED","PASS","PASS"]},
+    {"id":"tampered_regression","pr":404,"head":"value = }","fault":"tampered","truth":true,"recurrence":true,"expected":["ACCEPTED","REGRESSION_DETECTED","INCONCLUSIVE"]},
+    {"id":"missing_regression","pr":405,"head":"value = )","fault":"missing_artifact","truth":true,"recurrence":true,"expected":["ACCEPTED","REGRESSION_DETECTED","INCONCLUSIVE"]},
+    {"id":"provider_failure_regression","pr":406,"head":"value = ]","fault":"provider_503","truth":true,"recurrence":true,"expected":["ACCEPTED","REGRESSION_DETECTED","INCONCLUSIVE"]},
+    {"id":"tampered_clean","pr":407,"head":"value = 7","fault":"tampered","truth":false,"recurrence":false,"expected":["ACCEPTED","PASS","INCONCLUSIVE"]},
+    {"id":"missing_evidence","pr":408,"head":"value = ]","fault":"incomplete","truth":true,"recurrence":true,"expected":["ACCEPTED","INCONCLUSIVE","INCONCLUSIVE"]},
+    {"id":"revoked_clean","pr":409,"head":"value = 9","fault":"revoke","truth":false,"recurrence":false,"expected":["ACCEPTED","PASS","OBSERVED"]}
+  ]
+}
