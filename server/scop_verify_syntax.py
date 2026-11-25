@@ -30,6 +30,10 @@ class _Operational(Exception):
     """The check could not run."""
 
 
+class _IsolationUnavailable(_Operational):
+    """The executor could not establish its isolation contract."""
+
+
 def _source(identity, revision, path, deadline, expected_sha=None):
     if (len(path) > 1024 or "\\" in path or any(ord(ch) < 32 for ch in path)
             or any(part in {"", ".", ".."} for part in path.split("/"))):
@@ -213,6 +217,8 @@ def verify_syntax(pr_url, permissions=(), *, executor=None):
                 result = _check_file(identity, head, base, path, item, deadline, executor)
             except _Insufficient as exc:
                 result = {"status": "INCONCLUSIVE", "reason": str(exc)}
+            except _IsolationUnavailable:
+                raise
             except (_Operational, github._Unavailable) as exc:
                 result = {"status": "ERROR", "reason": str(exc)}
             results.append({"file": path, **result})
@@ -222,6 +228,7 @@ def verify_syntax(pr_url, permissions=(), *, executor=None):
         statuses = {result["status"] for result in results}
         overall = next(status for status in ("REGRESSION_DETECTED", "ERROR", "INCONCLUSIVE", "PASS")
                        if status in statuses)
+        report["compiler"] = getattr(executor, "compiler_version", None) or report["compiler"]
         return {**report, "status": overall, "files": results}
     except _Insufficient as exc:
         return {**report, "status": "INCONCLUSIVE", "reason": str(exc)}
