@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "source": "declarative observations only",
+  "cases": [
+    {"id":"regression","base":["pass","pass"],"head":["assertion_failed","assertion_failed"],"expected":"REGRESSION_DETECTED"},
+    {"id":"both_pass","base":["pass","pass"],"head":["pass","pass"],"expected":"PASS"},
+    {"id":"base_broken","base":["assertion_failed","assertion_failed"],"head":["assertion_failed","assertion_failed"],"expected":"INCONCLUSIVE"},
+    {"id":"test_changed","base":["pass","pass"],"head":["pass","pass"],"fault":"test_digest","expected":"INCONCLUSIVE"},
+    {"id":"dependency_changed","base":["pass","pass"],"head":["pass","pass"],"fault":"dependency_digest","expected":"INCONCLUSIVE"},
+    {"id":"environment_changed","base":["pass","pass"],"head":["pass","pass"],"fault":"environment_digest","expected":"INCONCLUSIVE"},
+    {"id":"flaky","base":["pass","pass"],"head":["assertion_failed","pass"],"expected":"INCONCLUSIVE"},
+    {"id":"different_assertions","base":["pass","pass"],"head":["assertion_failed","assertion_failed"],"fault":"assertion","expected":"INCONCLUSIVE"},
+    {"id":"guest_forgery","base":["pass","pass"],"head":["pass","pass"],"fault":"guest","expected":"ERROR"},
+    {"id":"unverified_assertion","base":["pass","pass"],"head":["assertion_failed","assertion_failed"],"fault":"unverified_assertion","expected":"INCONCLUSIVE"},
+    {"id":"timeout","base":["pass","pass"],"head":["assertion_failed","timeout"],"expected":"ERROR"},
+    {"id":"runner_unavailable","fault":"unavailable","expected":"ERROR"},
+    {"id":"same_execution_replayed","base":["pass","pass"],"head":["assertion_failed","assertion_failed"],"fault":"execution_id","expected":"ERROR"},
+    {"id":"revision_changed","base":["pass","pass"],"head":["pass","pass"],"fault":"revision","expected":"INCONCLUSIVE"},
+    {"id":"missing_test","base":["pass","pass"],"head":["pass","pass"],"fault":"coverage","expected":"INCONCLUSIVE"},
+    {"id":"recurrence_candidate","base":["pass","pass"],"head":["assertion_failed","assertion_failed"],"expected":"REGRESSION_DETECTED"},
+    {"id":"corrected_candidate","base":["pass","pass"],"head":["pass","pass"],"expected":"PASS"}
+  ]
+}
