@@ -333,7 +333,7 @@ def test_isolated_cloud_and_checks_lifecycle(pg, monkeypatch, tmp_path, dry_run)
     trust[rev(4).base_sha] += b" "
     assert send(4)["status"] == "INCONCLUSIVE"
     if not dry_run:
-        assert published[-1]["conclusion"] == "neutral"
+        assert published[-1]["conclusion"] == "action_required"
 
     # Revoke between claim and finish. The worker cannot finalize a violation.
     real_finish = Memory.dispatch
@@ -395,7 +395,7 @@ def test_isolated_cloud_and_checks_lifecycle(pg, monkeypatch, tmp_path, dry_run)
 
 
 @pytest.mark.parametrize(("provider_status", "status", "conclusion"), [
-    (404, "INCONCLUSIVE", "neutral"),
+    (404, "INCONCLUSIVE", "action_required"),
     (403, "ERROR", "action_required"),
     (429, "ERROR", "action_required"),
     (503, "ERROR", "action_required"),
@@ -414,12 +414,15 @@ def test_artifact_provider_error_is_not_a_success(monkeypatch, provider_status, 
             if action == "claim":
                 return {"run_id": WORKER, "protection_id": OTHER, "artifact_digest": "a" * 64}
             assert request["report"]["status"] == status
+            assert request["artifact_digest"] is None
             return {"run_id": WORKER, "outcome": status}
 
     monkeypatch.setattr(checks, "_request", request)
+    monkeypatch.setattr(checks, "verify_syntax", lambda *a, **kw: checks._error_report("ERROR", "Fixture unavailable"))
     result = checks.handle(*delivery(1), project=PROJECT, secret=SECRET,
                            memory=Memory(), github=checks.GitHub("fixture-installation", PROJECT))
     assert result["status"] == status
+    assert result["security_decision"] == "review_required"
 
 
 @pytest.mark.parametrize("mismatch", ["lost", "head_sha", "external_id", "conclusion", "status"])

@@ -257,20 +257,26 @@ def _error_report(status, reason):
 
 
 def _inspect(project, revision, claim, github, executor=None):
+    actual = None
+    protection_state = "not_configured"
     if claim.get("protection_id") is not None:
-        expected = _sha(claim.get("artifact_digest"), _DIGEST)
+        protection_state = "unchecked"
         try:
-            actual = sha256(github.artifact(revision.base_sha)).hexdigest()
+            expected = _sha(claim.get("artifact_digest"), _DIGEST)
+            candidate = sha256(github.artifact(revision.base_sha)).hexdigest()
+            if hmac.compare_digest(candidate, expected):
+                actual, protection_state = candidate, "verified"
+            else:
+                protection_state = "artifact_mismatch"
         except ArtifactUnavailable:
-            return _error_report("INCONCLUSIVE", "Approved artifact unavailable or invalid at trusted base"), None
-        if not hmac.compare_digest(actual, expected):
-            return _error_report("INCONCLUSIVE", "Trusted base artifact differs from approval"), None
-    else:
-        actual = None
+            protection_state = "artifact_unavailable"
+        except CheckError:
+            protection_state = "provider_error"
 
     meta = github.pull(revision.pr)
     if _revision(meta, project) != revision or meta.get("state") != "open":
-        return _error_report("INCONCLUSIVE", "PR moved before verification"), None
+        return {**_error_report("INCONCLUSIVE", "PR moved before verification"),
+                "protection_state": protection_state}, None
     # Use GitHub's canonical case while maintaining an exact, fixed origin and repository.
     name = meta["base"]["repo"]["full_name"]
     if project_key(name) != project.repository:
@@ -283,7 +289,13 @@ def _inspect(project, revision, claim, github, executor=None):
         or report.get("pr_url") != url or str(report.get("repository")).lower() != project.repository
         or report.get("pr") != revision.pr or report.get("rule") != RULE
     ):
-        return _error_report("INCONCLUSIVE", "Verifier returned a different revision"), None
+        return {**_error_report("INCONCLUSIVE", "Verifier returned a different revision"),
+                "protection_state": protection_state}, None
+    report = {**report, "verification_status": report["status"], "protection_state": protection_state}
+    if protection_state == "provider_error" and report["status"] != "REGRESSION_DETECTED":
+        report["status"] = "ERROR"
+    elif protection_state in {"artifact_unavailable", "artifact_mismatch"} and report["status"] == "ERROR":
+        report["status"] = "INCONCLUSIVE"
     return report, actual
 
 
@@ -322,11 +334,16 @@ def analyze(body, signature, delivery, event, *, project, secret, memory, github
                 report, digest = _error_report("INCONCLUSIVE", "PR moved during verification"), None
     except (CheckError, KeyError, TypeError, AttributeError):
         report, digest = _error_report("ERROR", "Evidence or provider unavailable"), None
+    dimensions = {
+        "verification_status": report.get("verification_status", report["status"]),
+        "protection_state": report.get("protection_state", "unchecked"),
+    }
     if durable and report["status"] == "ERROR":
         result = memory.dispatch("fail_durable", ownership)
         if result.get("run_id") != run or result.get("state") not in {"retryable", "terminal"}:
             raise CheckError("Execution failure transition not confirmed")
-        return {"status": result["state"].upper(), "run_id": run}
+        return {"status": result["state"].upper(), "run_id": run,
+                **dimensions, "security_decision": "review_required"}
     report["verifier_version"] = VERIFIER_VERSION
     result = memory.dispatch("finish_durable" if durable else "finish", {
         **ownership, "report": report, "artifact_digest": digest,
@@ -341,7 +358,12 @@ def analyze(body, signature, delivery, event, *, project, secret, memory, github
         report["status"] != {"PASS": "PASS", "VIOLATION": "REGRESSION_DETECTED"}[outcome]
     ):
         raise CheckError("Staging outcome does not match verified evidence")
-    return {"status": outcome, "run_id": run, "head_sha": revision.head_sha}
+    if outcome == "INACTIVE":
+        dimensions["protection_state"] = "inactive"
+    decision = {"PASS": "allow", "VIOLATION": "block", "OBSERVED": "not_enforced",
+                "INACTIVE": "not_enforced"}.get(outcome, "review_required")
+    return {"status": outcome, "run_id": run, "head_sha": revision.head_sha,
+            **dimensions, "security_decision": decision}
 
 
 def publish_result(result, publisher):
@@ -349,21 +371,23 @@ def publish_result(result, publisher):
     outcome = result["status"]
     run = _canonical_uuid(result["run_id"])
     head = _sha(result["head_sha"])
+    conclusion = ("action_required" if result.get("security_decision") == "review_required"
+                  else _CONCLUSION[outcome])
     try:
         check = publisher.publish({
             "name": "REIVRO Firewall (staging)", "head_sha": head,
-            "external_id": run, "status": "completed", "conclusion": _CONCLUSION[outcome],
+            "external_id": run, "status": "completed", "conclusion": conclusion,
             "output": {"title": outcome, "summary": _SUMMARY[outcome] + f" Audit run: `{run}`."},
         })
         if (check.get("head_sha") != head or check.get("external_id") != run
-                or check.get("status") != "completed" or check.get("conclusion") != _CONCLUSION[outcome]):
+                or check.get("status") != "completed" or check.get("conclusion") != conclusion):
             raise CheckError("Check response does not match requested publication")
-        return {"status": outcome, "run_id": run, "head_sha": head,
+        return {**result, "status": outcome, "run_id": run, "head_sha": head,
                 "check_id": _id(check["id"])}
     except (CheckError, KeyError, TypeError):
         # Delivery remains consumed. A timed-out POST may already have succeeded.
         return {"status": "PUBLICATION_UNCERTAIN", "run_id": run,
-                "head_sha": head, "outcome": outcome}
+                "head_sha": head, "outcome": outcome, "conclusion": conclusion}
 
 
 def reconcile_publication(result, app_id, candidates):
@@ -379,7 +403,7 @@ def reconcile_publication(result, app_id, candidates):
         if (check.get("app", {}).get("id") == app_id
                 and check.get("name") == "REIVRO Firewall (staging)"
                 and check.get("head_sha") == head and check.get("status") == "completed"
-                and check.get("conclusion") == _CONCLUSION[result["outcome"]]):
+                and check.get("conclusion") == result.get("conclusion", _CONCLUSION[result["outcome"]])):
             return {"status": "CONFIRMED", "check_id": _id(check.get("id")), "run_id": run}
     return {"status": "REVIEW_REQUIRED", "run_id": run}
 

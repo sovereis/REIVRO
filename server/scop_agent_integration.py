@@ -61,7 +61,7 @@ def public_result(item, status, *, report=None, finding_ids=(), protection=None,
             if type(file.get("line")) is int and file["line"] > 0:
                 entry["line"] = file["line"]
             files.append(entry)
-    verifier_status = report.get("status")
+    verifier_status = report.get("verification_status", report.get("status"))
     if verifier_status not in {"REGRESSION_DETECTED", "PASS", "INCONCLUSIVE", "ERROR"}:
         verifier_status = None
     evidence = None

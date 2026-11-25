@@ -26,3 +26,15 @@ TP e FP exigem detecção, TN e FN exigem decisão negativa, inclusive a aceita�
 Latência ponta a ponta inclui a operação da linha, RPCs locais e journal quando usados. Preparação, aprovação e revogação ficam fora dessa latência. A medição de CPU envolve apenas a chamada VERIFY, com tempo de usuário e sistema do processo e filhos aguardados, incluindo o compilador. O JSON também dá o tempo de parede desse trecho. As colunas de tempo humano de retrabalho, tentativas de correção, reincidência por projeto e tempo até resolução ficam nulas até um ensaio futuro registrar início/fim de retrabalho, IDs de tentativa e evidência de resolução.
 
 A próxima etapa é comparar o mesmo protocolo em PRs autorizados, com observação de decisões de bloqueio e resultados de correção sob política aprovada. Este relatório não estima horas economizadas nem generaliza a regra de sintaxe para outras regressões.
+
+## V2 e profiling
+
+O V1 publicado permanece intacto. O V2 usa [um novo manifesto](scenarios-v2.json) congelado antes da execução, com três repetições dos nove cenários e PRs sintéticos distintos por repetição. Execute:
+
+```bash
+PYTHON=python3 bash scripts/test-firewall-staging.sh --benchmark-v2 /tmp/reivro-effectiveness-v2
+```
+
+No perfil C, V2 contabiliza a decisão de VERIFY inclusive quando a operação termina INCONCLUSIVE por falha de proteção. A saída preserva independência entre `verification_status`, `protection_state`, `security_decision` e `status`. O benchmark exige achado persistido para as regressões com artefato alterado, ausente e indisponível. Também exige revisão, sem sucesso, para código limpo com artefato alterado.
+
+O profiling registra tempos por fronteira, com relógio monotônico. `database_ms` inclui transporte de fixture e processos Docker/psql por RPC, inclusive leitura para entrega do relatório. `agent_io_ms` exclui a porção DB e inclui processamento local e journal. `verify_wall_ms` inclui startup e compilação, e `verify_cpu_ms` mede CPU do verificador e filhos esperados. O tempo total inclui o restante do worker, como escopo, HMAC e transporte GitHub em memória. O perfil não mede latência de rede hospedada. Não usar a diferença entre amostras publicadas como estimativa de latência de produção.

@@ -44,6 +44,12 @@ def write_reports(directory, metadata, scenarios, rows):
     if [(row["mode"], row["scenario"]) for row in rows] != targets:
         raise ValueError("Expected one ordered result for every scenario and mode")
     summaries = {mode: summarize([row for row in rows if row["mode"] == mode]) for mode in ("A", "B", "C")}
+    profiled = [row for row in rows if row["mode"] == "C" and "database_ms" in row]
+    if profiled:
+        summaries["C"]["profile_total_ms"] = {
+            key: round(sum(row[key] for row in profiled), 3)
+            for key in ("database_ms", "agent_io_ms", "verify_wall_ms", "elapsed_ms")
+        }
     integrity = all(
         row["status"] == row["expected"] == case["expected"]["ABC".index(row["mode"])]
         and row["truth"] is case["truth"] and row["recurrence"] is case["recurrence"]
@@ -55,10 +61,10 @@ def write_reports(directory, metadata, scenarios, rows):
     data = {**metadata, "integrity": integrity, "summary": summaries, "results": rows}
     (path / "results.json").write_text(json.dumps(data, indent=2, allow_nan=False) + "\n")
     with (path / "results.csv").open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(handle, fieldnames=list(dict.fromkeys(key for row in rows for key in row)))
         writer.writeheader()
         writer.writerows(rows)
-    lines = ["# REIVRO effectiveness benchmark v1", "", f"Code: `{metadata['code_sha']}`.",
+    lines = [f"# REIVRO effectiveness benchmark v{metadata.get('scenario_version', 1)}", "", f"Code: `{metadata['code_sha']}`.",
              f"Integrity: {'PASS' if integrity else 'FAIL'}.", "",
              "| Mode | TP | FP | TN | FN | Undecided positive | Undecided negative | Median ms | P95 ms |",
              "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"]

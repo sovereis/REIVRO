@@ -1,0 +1,13 @@
+{
+  "fixture_version": 1,
+  "executed": false,
+  "scenarios": [
+    {"id":"deterministic_assertion", "base":["pass","pass"], "head":["assertion_failed","assertion_failed"], "trusted_inputs_unchanged":true, "expected":"REGRESSION_DETECTED"},
+    {"id":"already_broken", "base":["assertion_failed","assertion_failed"], "head":["assertion_failed","assertion_failed"], "trusted_inputs_unchanged":true, "expected":"INCONCLUSIVE"},
+    {"id":"flaky_head", "base":["pass","pass"], "head":["assertion_failed","pass"], "trusted_inputs_unchanged":true, "expected":"INCONCLUSIVE"},
+    {"id":"head_changes_test", "base":[], "head":[], "trusted_inputs_unchanged":false, "expected":"INCONCLUSIVE"},
+    {"id":"passing", "base":["pass","pass"], "head":["pass","pass"], "trusted_inputs_unchanged":true, "expected":"PASS"},
+    {"id":"runner_timeout", "base":["pass","pass"], "head":["timeout"], "trusted_inputs_unchanged":true, "expected":"ERROR"},
+    {"id":"isolation_unverified", "base":[], "head":[], "trusted_inputs_unchanged":true, "expected":"ERROR"}
+  ]
+}
