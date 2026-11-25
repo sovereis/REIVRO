@@ -62,6 +62,7 @@ def capture(memory, report, artifact_checkout, **selection):
 
 
 def workflow(root):
+    root.mkdir(parents=True, exist_ok=True)
     memory = Memory(root / "memory", PROJECT)
     memory.initialize()
     artifact_checkout = root / "artifacts"
