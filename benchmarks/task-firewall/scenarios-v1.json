@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "repetitions": 3,
+  "cases": [
+    {"id":"original_incomplete","status":"INCOMPLETE","recurrence":false,"truth_policy_violation":null},
+    {"id":"cross_task_recurrence","status":"POLICY_VIOLATION","recurrence":true,"truth_policy_violation":true},
+    {"id":"authorized_correction","status":"VERIFIED","recurrence":false,"truth_policy_violation":false},
+    {"id":"artifact_tampered","status":"ERROR","recurrence":false,"truth_policy_violation":null},
+    {"id":"revoked","status":"INCONCLUSIVE","recurrence":false,"truth_policy_violation":null}
+  ]
+}
