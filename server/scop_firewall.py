@@ -59,11 +59,21 @@ class Firewall:
         return {"report": report, "pr_url": url, "verifier_version": VERIFIER_VERSION,
                 "duration_ms": round((monotonic() - started) * 1000, 3), "cost": None}
 
-    def analyze(self, url, permission):
+    @staticmethod
+    def _pin(analysis, expected_head):
+        if expected_head is not None:
+            report = analysis["report"]
+            actual = report.get("head_sha")
+            if actual != expected_head and (actual is not None or report["status"] != "ERROR"):
+                return {**analysis, "report": {"status": "INCONCLUSIVE",
+                        "reason": "Verified HEAD differs from requested revision"}}
+        return analysis
+
+    def analyze(self, url, permission, *, expected_head=None):
         pr = self._check_pr(url, permission)
         with self.memory.transaction():
             pass
-        analysis = self._verify(url, pr)
+        analysis = self._pin(self._verify(url, pr), expected_head)
         with self.memory.transaction(write=True) as db:
             return self._record_analysis(db, analysis)
 
@@ -206,7 +216,7 @@ class Firewall:
             self.memory.append(db, "protection_exported", protection_id, {"version": manifest["version"]})
             return {"path": path, "protection_id": protection_id}
 
-    def run(self, protection_id, checkout, url, permission):
+    def run(self, protection_id, checkout, url, permission, *, expected_head=None):
         pr = self._check_pr(url, permission)
         run_id = "r-" + uuid4().hex
         with self.memory.transaction(write=True) as db:
@@ -227,7 +237,7 @@ class Firewall:
             })
 
         try:
-            analysis = self._verify(url, pr)
+            analysis = self._pin(self._verify(url, pr), expected_head)
         except KeyboardInterrupt:
             with self.memory.transaction(write=True) as db:
                 return self._record_run(db, run_id, protection_id, url, {
