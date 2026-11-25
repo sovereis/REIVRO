@@ -103,3 +103,21 @@ reivro revoke "$PROTECTION" --reason "This project no longer requires the quicks
 Static verification checks pinned commits and supported predicates. Uncommitted changes, semantic task completion, functional execution, and hosted Cloud Memory verification are outside this preview. Manual and hosted-evidence criteria remain inconclusive here. Preview authorization and revocation are local. No third-party client or hosted enforcement was validated in the demo.
 
 An external alpha should validate the clean install on a second operator's machine, a real client handoff without operator-store access, recovery from a preserved journal, and representative project policy conflicts. Measure independently whether participants can complete setup, interpret evidence, and recover failures. Any hosted enforcement needs separate validation and authorization.
+
+## Local validation measurements
+
+The source at `e24ec49` was extracted from Git into a fresh temporary home and launched through the documented symlink with only system Python, Git, and a minimal environment. The measurements exclude downloading the source.
+
+| Measurement | Observed |
+| --- | ---: |
+| Create the launcher and run `--help` | 507.937 ms |
+| Create and initialize the demo project, median of five | 45.298 ms |
+| Time through the first demo verification, median of five | 102.761 ms |
+| Verification operations inside the demo, median of 20 | 26.886 ms |
+| Slowest of those 20 verification operations | 35.438 ms |
+| Demo runs completed | 5 of 5 |
+| REIVRO commands through first verification | 3 required, plus optional `doctor` |
+| Demo steps | 13 per run |
+| Missing project or journal configuration | Exit 1 with instructions |
+
+The demo executes the CLI dispatcher in one process. These measurements exclude human review, agent turnaround, repository import, and repeated process startup. They describe one environment and one synthetic workload.
