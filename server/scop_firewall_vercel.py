@@ -88,9 +88,14 @@ def consume(item, *, config=configuration, memory_factory=checks.StagingMemory,
     memory = memory_factory(STAGING, os.environ["REIVRO_PUBLISHABLE_KEY"], os.environ["REIVRO_WORKER_JWT"])
     github = github_factory(os.environ["REIVRO_GITHUB_INSTALLATION_TOKEN"], project)
     result = checks.analyze(body, signature, key, "pull_request", project=project, secret=secret,
-                            memory=memory, github=github, executor=compiler_factory())
-    if result["status"] in {"DUPLICATE", "ERROR"}:
-        LOG.warning("dry-run review required: %s %s", key, result["status"])
+                            memory=memory, github=github, executor=compiler_factory(), durable=True)
+    if result["status"] in {"BUSY", "RETRYABLE"}:
+        raise RuntimeError("Dry-run delivery requires retry")
+    if result["status"] not in {"COMPLETED", "TERMINAL", "OBSERVED", "VIOLATION",
+                                "PASS", "INCONCLUSIVE", "INACTIVE"}:
+        raise RuntimeError("Dry-run completion not confirmed")
+    if result["status"] == "TERMINAL":
+        LOG.warning("dry-run attempt budget exhausted: %s", result["run_id"])
     return result["status"]
 
 

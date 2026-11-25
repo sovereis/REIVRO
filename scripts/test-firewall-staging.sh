@@ -32,6 +32,7 @@ insert into auth.users values
     ('00000000-0000-0000-0000-000000000003');
 SQL
 psql < supabase/staging/001_firewall.sql
+psql < supabase/staging/002_durable_execution.sql
 psql <<'SQL'
 insert into reivro_cloud.projects (id,repository_id,repository,installation_id,trusted_base) values
     ('10000000-0000-0000-0000-000000000001',101,'example/fixture',201,'main'),
@@ -42,4 +43,4 @@ insert into reivro_cloud.memberships values
     ('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000003','reviewer');
 SQL
 REIVRO_LOCAL_TEST_POSTGRES="$name" PYTHONDONTWRITEBYTECODE=1 "${PYTHON:-python}" \
-    -m pytest -q tests/test_scop_firewall_checks.py
+    -m pytest -q tests/test_scop_firewall_checks.py tests/test_scop_firewall_recovery.py

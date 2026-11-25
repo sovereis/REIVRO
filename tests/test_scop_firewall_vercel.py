@@ -119,18 +119,21 @@ def test_dry_run_retry_and_revision_dedup_with_injected_transports(monkeypatch, 
             assert (ref, key, jwt) == (hosted.STAGING, "test-key", "test-jwt")
 
         def dispatch(self, action, request):
-            if action == "claim":
+            if action == "claim_durable":
                 if not transitions:
                     transitions.append("transport-failure")
                     raise checks.CheckError("fixture unavailable")
                 revision_key = (request["pr"], request["base_sha"], request["head_sha"])
                 if revision_key in seen:
-                    return {"duplicate": True}
+                    return {"state": "completed", "run_id": run}
                 seen.add(revision_key)
                 transitions.append("claim")
-                return {"run_id": run}
+                return {"state": "running", "run_id": run, "attempt_id": str(uuid4()), "fence": 1}
+            if action == "renew_durable":
+                return {"state": "running", "run_id": run}
+            assert action == "finish_durable"
             transitions.append("finish")
-            return {"outcome": "INCONCLUSIVE", "run_id": run}
+            return {"state": "completed", "outcome": "INCONCLUSIVE", "run_id": run}
 
     class Evidence:
         def __init__(self, token, project):
@@ -149,7 +152,7 @@ def test_dry_run_retry_and_revision_dedup_with_injected_transports(monkeypatch, 
     with pytest.raises(checks.CheckError):
         hosted.consume(item, **options)
     assert hosted.consume(item, **options) == "INCONCLUSIVE"
-    assert hosted.consume({**item, "delivery": str(uuid4())}, **options) == "DUPLICATE"
+    assert hosted.consume({**item, "delivery": str(uuid4())}, **options) == "COMPLETED"
     assert hosted.consume({**item, "signature": "forged"}, **options) == "REJECTED"
     assert transitions == ["transport-failure", "claim", "finish"]
     assert "test-jwt" not in caplog.text

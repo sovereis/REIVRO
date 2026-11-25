@@ -287,27 +287,52 @@ def _inspect(project, revision, claim, github, executor=None):
     return report, actual
 
 
-def analyze(body, signature, delivery, event, *, project, secret, memory, github, executor=None):
+def analyze(body, signature, delivery, event, *, project, secret, memory, github, executor=None,
+            durable=False):
     key, revision = authenticate(body, signature, delivery, event, secret, project)
-    if not _same_revision(github, project, revision):
+    if not durable and not _same_revision(github, project, revision):
         return {"status": "STALE"}
     scope = {"repository_id": project.repository_id, "installation_id": project.installation_id}
-    claim = memory.dispatch("claim", {
+    claim = memory.dispatch("claim_durable" if durable else "claim", {
         **scope, "repository": project.repository, "base_ref": project.base_ref, "delivery": key,
         "pr": revision.pr, "base_sha": revision.base_sha, "head_sha": revision.head_sha,
     })
-    if claim.get("duplicate") is True:
+    if not durable and claim.get("duplicate") is True:
         return {"status": "DUPLICATE"}
     run = _canonical_uuid(claim.get("run_id"))
+    ownership = {**scope, "run_id": run}
+    if durable:
+        state = claim.get("state")
+        if state in {"completed", "terminal", "busy"}:
+            return {"status": state.upper(), "run_id": run}
+        fence = claim.get("fence")
+        if state != "running" or type(fence) is not int or not 1 <= fence <= 3:
+            raise CheckError("Invalid execution claim")
+        ownership.update(attempt_id=_canonical_uuid(claim.get("attempt_id")), fence=fence)
     try:
-        report, digest = _inspect(project, revision, claim, github, executor)
-        if not _same_revision(github, project, revision):
-            report, digest = _error_report("INCONCLUSIVE", "PR moved during verification"), None
+        if durable and not _same_revision(github, project, revision):
+            report, digest = _error_report("INCONCLUSIVE", "PR revision is no longer current"), None
+        else:
+            if durable:
+                renewed = memory.dispatch("renew_durable", ownership)
+                if renewed != {"state": "running", "run_id": run}:
+                    raise CheckError("Execution lease renewal not confirmed")
+            report, digest = _inspect(project, revision, claim, github, executor)
+            if not _same_revision(github, project, revision):
+                report, digest = _error_report("INCONCLUSIVE", "PR moved during verification"), None
     except (CheckError, KeyError, TypeError, AttributeError):
         report, digest = _error_report("ERROR", "Evidence or provider unavailable"), None
+    if durable and report["status"] == "ERROR":
+        result = memory.dispatch("fail_durable", ownership)
+        if result.get("run_id") != run or result.get("state") not in {"retryable", "terminal"}:
+            raise CheckError("Execution failure transition not confirmed")
+        return {"status": result["state"].upper(), "run_id": run}
     report["verifier_version"] = VERIFIER_VERSION
-    result = memory.dispatch("finish", {**scope, "run_id": run, "report": report,
-                                        "artifact_digest": digest})
+    result = memory.dispatch("finish_durable" if durable else "finish", {
+        **ownership, "report": report, "artifact_digest": digest,
+    })
+    if durable and result.get("state") != "completed":
+        raise CheckError("Execution completion not confirmed")
     outcome = result.get("outcome")
     if result.get("run_id") != run or outcome not in _CONCLUSION:
         raise CheckError("Unexpected result from staging memory")
