@@ -176,6 +176,8 @@ def test_finish_report_matches_hosted_pr_contract(pg, monkeypatch):
 
     # GitHub's canonical repository casing may differ from the database key.
     report["pr_url"] = "https://github.com/Example/Fixture/pull/90"
+    proposed_functional = {**request, "report": {**report, "rule": "functional-regression-v1"}}
+    assert "Invalid verification report" in rpc(pg, WORKER, "finish", proposed_functional, valid=False)
     assert client.dispatch("finish", request) == {"run_id": claim["run_id"], "outcome": "OBSERVED"}
 
 
