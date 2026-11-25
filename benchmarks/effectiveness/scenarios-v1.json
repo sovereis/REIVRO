@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "seed": null,
+  "scenarios": [
+    {"id":"valid","pr":301,"head":"value = 2","fault":"none","truth":false,"recurrence":false,"expected":["ACCEPTED","PASS","OBSERVED"]},
+    {"id":"novel","pr":302,"head":"value = )","fault":"none","truth":true,"recurrence":false,"expected":["ACCEPTED","REGRESSION_DETECTED","OBSERVED"]},
+    {"id":"recurrence","pr":303,"head":"value = ]","fault":"approve","truth":true,"recurrence":true,"expected":["ACCEPTED","REGRESSION_DETECTED","VIOLATION"]},
+    {"id":"approved_valid","pr":304,"head":"value = 3","fault":"none","truth":false,"recurrence":false,"expected":["ACCEPTED","PASS","PASS"]},
+    {"id":"tampered_artifact","pr":305,"head":"value = }","fault":"tampered","truth":true,"recurrence":true,"expected":["ACCEPTED","REGRESSION_DETECTED","INCONCLUSIVE"]},
+    {"id":"revoked","pr":306,"head":"value = )","fault":"revoke","truth":true,"recurrence":true,"expected":["ACCEPTED","REGRESSION_DETECTED","OBSERVED"]},
+    {"id":"incomplete","pr":307,"head":"value = ]","fault":"incomplete","truth":true,"recurrence":true,"expected":["ACCEPTED","INCONCLUSIVE","INCONCLUSIVE"]},
+    {"id":"divergent","pr":308,"head":"value = 4","fault":"divergent","truth":null,"recurrence":false,"expected":["ACCEPTED","INCONCLUSIVE","INCONCLUSIVE"]},
+    {"id":"execution_failure","pr":309,"head":"value = 5","fault":"executor","truth":false,"recurrence":false,"expected":["ACCEPTED","ERROR","RETRYABLE"]},
+    {"id":"duplicate","pr":303,"head":"value = ]","fault":"replay","truth":null,"recurrence":true,"expected":["ACCEPTED","REGRESSION_DETECTED","COMPLETED"]}
+  ]
+}
