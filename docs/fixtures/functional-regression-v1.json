@@ -1,6 +1,15 @@
 {
   "fixture_version": 1,
   "executed": false,
+  "firewall_lifecycle": {
+    "executed": false,
+    "requires_controller_attestation": true,
+    "expected": [
+      {"fixture":"human_approved_and_recurrence", "verification":"REGRESSION_DETECTED", "protection":"active", "security_decision":"block"},
+      {"fixture":"human_revoked_and_recurrence", "verification":"REGRESSION_DETECTED", "protection":"inactive", "security_decision":"not_enforced"},
+      {"fixture":"new_head_after_correction", "verification":"PASS", "protection":"active", "security_decision":"allow"}
+    ]
+  },
   "scenarios": [
     {"id":"deterministic_assertion", "base":["pass","pass"], "head":["assertion_failed","assertion_failed"], "trusted_inputs_unchanged":true, "expected":"REGRESSION_DETECTED"},
     {"id":"already_broken", "base":["assertion_failed","assertion_failed"], "head":["assertion_failed","assertion_failed"], "trusted_inputs_unchanged":true, "expected":"INCONCLUSIVE"},

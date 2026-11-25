@@ -27,7 +27,7 @@ Executar `bash scripts/probe-functional-runner.sh` somente em ambiente que já t
 
 | Controle | Evidência observada |
 | --- | --- |
-| Separação do host | Caminho de workspace e socket Docker ausentes na VM de processo. O probe não cobre fugas nem todos os recursos do host. |
+| Separação do host | Caminho de workspace e socket Docker ausentes no contêiner do probe. O probe não cobre fugas nem todos os recursos do host. |
 | Rede e credenciais | `--network none`, nenhuma rota IPv4, nenhuma das quatro variáveis de credencial verificadas. Não houve tráfego de teste, montagem de credenciais ou acesso a credenciais do host. |
 | Privilégio | UID 65534 e capacidades efetivas zeradas. O status `NoNewPrivs` não pôde ser confirmado. |
 | Recursos | CPU, memória e processos não observáveis pelos arquivos de cgroup. A raiz rejeitou escrita e o tmpfs reportou 1 MiB. A política efetiva de armazenamento de toda a execução segue sem comprovação. |

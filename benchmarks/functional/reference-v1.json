@@ -1,0 +1,280 @@
+{
+  "manifest_sha256": "f83f57bb943f01e8c73ea14209e26443f78049377db76ca671e5bd11b36d1ad9",
+  "version": 1,
+  "source": "declarative observations only",
+  "runtime_executions": 0,
+  "firewall_enforced": false,
+  "matched": 17,
+  "results": [
+    {
+      "id": "regression",
+      "expected": "REGRESSION_DETECTED",
+      "rule": "functional-regression-v1",
+      "status": "REGRESSION_DETECTED",
+      "reason": "stable_comparison",
+      "trace": {
+        "repository": "example/fixture",
+        "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "test_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "dependency_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "environment_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "tests": [
+          "suite.case"
+        ],
+        "runs": [
+          {
+            "execution_id": "base-0",
+            "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "fa0f80a3b99181661d386f460ecd5fc23ec144ccf31356bb2cc93d704885c7e9"
+          },
+          {
+            "execution_id": "base-1",
+            "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "2fc6097d8caf9b1094b6ec20d3b9e66adc6065a1aad5fb6f6bcd08cece309396"
+          },
+          {
+            "execution_id": "head-0",
+            "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "evidence_digest": "b3df49745ca9b8f3475a50db7c7ffc97e934b46fbfb9034f9dc835d8ed6f2c7a"
+          },
+          {
+            "execution_id": "head-1",
+            "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "evidence_digest": "bca8bf016ab3e996d0ed642c65483676b934d6db51abf58b175071016fb5715d"
+          }
+        ],
+        "assertions": [
+          {
+            "test_id": "suite.case",
+            "assertion_digest": "4444444444444444444444444444444444444444444444444444444444444444"
+          }
+        ]
+      },
+      "evidence_id": "functional-73451cf35425dfba9f8a857d6bee40ebd3458ed83fc44ac3155257d7c4820c3e"
+    },
+    {
+      "id": "both_pass",
+      "expected": "PASS",
+      "rule": "functional-regression-v1",
+      "status": "PASS",
+      "reason": "stable_comparison",
+      "trace": {
+        "repository": "example/fixture",
+        "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "test_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "dependency_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "environment_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "tests": [
+          "suite.case"
+        ],
+        "runs": [
+          {
+            "execution_id": "base-0",
+            "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "fa0f80a3b99181661d386f460ecd5fc23ec144ccf31356bb2cc93d704885c7e9"
+          },
+          {
+            "execution_id": "base-1",
+            "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "2fc6097d8caf9b1094b6ec20d3b9e66adc6065a1aad5fb6f6bcd08cece309396"
+          },
+          {
+            "execution_id": "head-0",
+            "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "evidence_digest": "b3df49745ca9b8f3475a50db7c7ffc97e934b46fbfb9034f9dc835d8ed6f2c7a"
+          },
+          {
+            "execution_id": "head-1",
+            "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "evidence_digest": "bca8bf016ab3e996d0ed642c65483676b934d6db51abf58b175071016fb5715d"
+          }
+        ],
+        "assertions": []
+      },
+      "evidence_id": "functional-fada9986ac4b080f35f2b8ebcc0a6d839cf3bad7d84f5659b5230bc0a4f042d5"
+    },
+    {
+      "id": "base_broken",
+      "expected": "INCONCLUSIVE",
+      "rule": "functional-regression-v1",
+      "status": "INCONCLUSIVE",
+      "reason": "baseline_failed"
+    },
+    {
+      "id": "test_changed",
+      "expected": "INCONCLUSIVE",
+      "rule": "functional-regression-v1",
+      "status": "INCONCLUSIVE",
+      "reason": "trusted_inputs_changed"
+    },
+    {
+      "id": "dependency_changed",
+      "expected": "INCONCLUSIVE",
+      "rule": "functional-regression-v1",
+      "status": "INCONCLUSIVE",
+      "reason": "trusted_inputs_changed"
+    },
+    {
+      "id": "environment_changed",
+      "expected": "INCONCLUSIVE",
+      "rule": "functional-regression-v1",
+      "status": "INCONCLUSIVE",
+      "reason": "trusted_inputs_changed"
+    },
+    {
+      "id": "flaky",
+      "expected": "INCONCLUSIVE",
+      "rule": "functional-regression-v1",
+      "status": "INCONCLUSIVE",
+      "reason": "unstable_result"
+    },
+    {
+      "id": "different_assertions",
+      "expected": "INCONCLUSIVE",
+      "rule": "functional-regression-v1",
+      "status": "INCONCLUSIVE",
+      "reason": "unstable_result"
+    },
+    {
+      "id": "guest_forgery",
+      "expected": "ERROR",
+      "rule": "functional-regression-v1",
+      "status": "ERROR",
+      "reason": "invalid_controller_record"
+    },
+    {
+      "id": "unverified_assertion",
+      "expected": "INCONCLUSIVE",
+      "rule": "functional-regression-v1",
+      "status": "INCONCLUSIVE",
+      "reason": "assertion_unverified"
+    },
+    {
+      "id": "timeout",
+      "expected": "ERROR",
+      "rule": "functional-regression-v1",
+      "status": "ERROR",
+      "reason": "execution_failed"
+    },
+    {
+      "id": "runner_unavailable",
+      "expected": "ERROR",
+      "rule": "functional-regression-v1",
+      "status": "ERROR",
+      "reason": "runner_unavailable"
+    },
+    {
+      "id": "same_execution_replayed",
+      "expected": "ERROR",
+      "rule": "functional-regression-v1",
+      "status": "ERROR",
+      "reason": "invalid_controller_record"
+    },
+    {
+      "id": "revision_changed",
+      "expected": "INCONCLUSIVE",
+      "rule": "functional-regression-v1",
+      "status": "INCONCLUSIVE",
+      "reason": "revision_mismatch"
+    },
+    {
+      "id": "missing_test",
+      "expected": "INCONCLUSIVE",
+      "rule": "functional-regression-v1",
+      "status": "INCONCLUSIVE",
+      "reason": "coverage_mismatch"
+    },
+    {
+      "id": "recurrence_candidate",
+      "expected": "REGRESSION_DETECTED",
+      "rule": "functional-regression-v1",
+      "status": "REGRESSION_DETECTED",
+      "reason": "stable_comparison",
+      "trace": {
+        "repository": "example/fixture",
+        "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "test_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "dependency_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "environment_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "tests": [
+          "suite.case"
+        ],
+        "runs": [
+          {
+            "execution_id": "base-0",
+            "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "fa0f80a3b99181661d386f460ecd5fc23ec144ccf31356bb2cc93d704885c7e9"
+          },
+          {
+            "execution_id": "base-1",
+            "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "2fc6097d8caf9b1094b6ec20d3b9e66adc6065a1aad5fb6f6bcd08cece309396"
+          },
+          {
+            "execution_id": "head-0",
+            "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "evidence_digest": "b3df49745ca9b8f3475a50db7c7ffc97e934b46fbfb9034f9dc835d8ed6f2c7a"
+          },
+          {
+            "execution_id": "head-1",
+            "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "evidence_digest": "bca8bf016ab3e996d0ed642c65483676b934d6db51abf58b175071016fb5715d"
+          }
+        ],
+        "assertions": [
+          {
+            "test_id": "suite.case",
+            "assertion_digest": "4444444444444444444444444444444444444444444444444444444444444444"
+          }
+        ]
+      },
+      "evidence_id": "functional-73451cf35425dfba9f8a857d6bee40ebd3458ed83fc44ac3155257d7c4820c3e"
+    },
+    {
+      "id": "corrected_candidate",
+      "expected": "PASS",
+      "rule": "functional-regression-v1",
+      "status": "PASS",
+      "reason": "stable_comparison",
+      "trace": {
+        "repository": "example/fixture",
+        "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "test_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "dependency_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "environment_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "tests": [
+          "suite.case"
+        ],
+        "runs": [
+          {
+            "execution_id": "base-0",
+            "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "fa0f80a3b99181661d386f460ecd5fc23ec144ccf31356bb2cc93d704885c7e9"
+          },
+          {
+            "execution_id": "base-1",
+            "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "2fc6097d8caf9b1094b6ec20d3b9e66adc6065a1aad5fb6f6bcd08cece309396"
+          },
+          {
+            "execution_id": "head-0",
+            "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "evidence_digest": "b3df49745ca9b8f3475a50db7c7ffc97e934b46fbfb9034f9dc835d8ed6f2c7a"
+          },
+          {
+            "execution_id": "head-1",
+            "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "evidence_digest": "bca8bf016ab3e996d0ed642c65483676b934d6db51abf58b175071016fb5715d"
+          }
+        ],
+        "assertions": []
+      },
+      "evidence_id": "functional-fada9986ac4b080f35f2b8ebcc0a6d839cf3bad7d84f5659b5230bc0a4f042d5"
+    }
+  ],
+  "code_sha": "93db130c7fa3212fc6d8796cb6b67602c3311936"
+}
