@@ -9,9 +9,12 @@ import subprocess
 import sys
 from time import monotonic
 
+from .scop_agent_feedback import link_correction, record_report
 from .scop_agent_integration import SHA, read_json, validate, uuid_text
+from .scop_firewall import Firewall
+from . import scop_task_policy as policy_rules
 from .scop_firewall_checks import StagingMemory
-from .scop_firewall_memory import Memory, identifier, project_key
+from .scop_firewall_memory import FirewallError, Memory, identifier, project_key
 from .scop_firewall_pilot import STAGING
 
 RULE = "task-completion-v1"
@@ -176,7 +179,7 @@ def cloud_evidence(criterion, contract, head, env):
         return None
 
 
-def inspect(contract, git, head, env):
+def inspect(contract, git, head, env, *, policy=None):
     if git.head() != head:
         return {"status": "INCONCLUSIVE", "reason": "head_mismatch"}
     base = contract["base_sha"]
@@ -211,27 +214,91 @@ def inspect(contract, git, head, env):
                 observed = git.blob(head, path, digest=True) == criterion["digest"]
         criteria.append({"index": index, "kind": kind,
                          "outcome": {True: "met", False: "unmet", None: "unverified"}[observed]})
+    policy_paths = policy_rules.evaluate(policy, git, head, paths) if policy else []
     if git.head() != head:
         return {"status": "INCONCLUSIVE", "reason": "head_moved"}
     outcomes = {criterion["outcome"] for criterion in criteria}
     status = ("POLICY_VIOLATION" if violations else "INCOMPLETE" if "unmet" in outcomes else
               "INCONCLUSIVE" if "unverified" in outcomes else "VERIFIED")
     return {"status": status, "base_sha": base, "observed_head_sha": head,
-            "criteria": criteria, "violations": violations}
+            "criteria": criteria, "violations": violations, "policy_paths": policy_paths}
 
 
-def verify(memory, submission, digest, git, env):
+def capture_finding(memory, event_id, *, criterion_index=None, violation_index=None):
+    """Operator-only selection of one eligible observation from the private journal."""
+    with memory.transaction(write=True) as db:
+        entries = memory.history(db, "task-event-" + uuid_text(event_id))
+        if len(entries) != 1 or entries[0]["kind"] != "task_verified":
+            raise ValueError("No verified task event")
+        report = entries[0]["data"]["report"]
+        evidence_id = report["evidence_id"]
+        if (report.get("project") != memory.repository or
+                evidence_id != identifier("task-evidence", {k: v for k, v in report.items() if k != "evidence_id"})):
+            raise ValueError("Task evidence digest mismatch")
+        contract = active_contract(memory, db, report["task_id"], report["contract_digest"])
+        policy, paths = policy_rules.from_failure(contract, report, criterion_index, violation_index)
+        evidence = {"repository": memory.repository, "head_sha": report["observed_head_sha"],
+                    "verifier_version": policy_rules.VERSION, "task_id": report["task_id"],
+                    "event_id": event_id, "evidence_id": evidence_id, "policy": policy,
+                    "failure_keys": [policy_rules.failure_key(memory.repository, policy, path) for path in paths],
+                    "criterion_index": criterion_index, "violation_index": violation_index}
+        finding_id = identifier("f", evidence)
+        if not memory.history(db, finding_id):
+            memory.append(db, "finding", finding_id, evidence)
+    return {"status": "FINDING_RECORDED", "finding_id": finding_id, "evidence_id": evidence_id}
+
+
+def select_policy(firewall, db, protection, checkout, contract):
+    manifest = firewall._active(db, protection)
+    if manifest is None:
+        return "inactive", None
+    if manifest["category"] != policy_rules.CATEGORY:
+        return "unsupported", None
+    if not firewall._artifact_matches(checkout, protection, manifest):
+        return "artifact_invalid", None
+    if policy_rules.conflicts(manifest["policy"], contract):
+        return "conflict", None
+    return "eligible", manifest
+
+
+def policy_result(firewall, db, protection, selection, item, result):
+    state, manifest = selection
+    paths = result.pop("policy_paths", ())
+    if manifest is None or "observed_head_sha" not in result:
+        return {"id": protection, "state": state if manifest is None else "unverified", "recurrence": False}
+    source = firewall._events(db, manifest["source_finding_id"], "finding")[0]["data"]
+    keys = [policy_rules.failure_key(item["project"], manifest["policy"], path) for path in paths]
+    recurrence = (item["task_id"] != source["task_id"] and item["head_sha"] != source["head_sha"]
+                  and bool(set(keys).intersection(source["failure_keys"])))
+    return {"id": protection, "state": "violated" if paths else "clear", "recurrence": recurrence,
+            "source_finding_id": manifest["source_finding_id"], "failure_keys": keys,
+            "source_evidence_id": source["evidence_id"]}
+
+
+def verify(memory, submission, digest, git, env, *, protection=None, artifact_checkout=None,
+           after_correction=None):
     item = validate(submission)
-    if item["project"] != memory.repository:
-        raise ValueError("Submission project mismatch")
+    if (item["project"] != memory.repository or bool(protection) != bool(artifact_checkout)
+            or after_correction and not protection or protection is not None and
+            not re.fullmatch(r"p-[0-9a-f]{64}", protection)):
+        raise ValueError("Invalid operator policy selection or project")
     event = "task-event-" + item["event_id"]
-    fingerprint = identifier("submission", [item, digest])
+    agent_event = "agent-event-" + item["event_id"]
+    identity = [item, digest]
+    if protection:
+        identity.extend([protection, uuid_text(after_correction) if after_correction else None])
+    fingerprint = identifier("submission", identity)
+    firewall = Firewall(memory)
     with memory.transaction() as db:
         contract = active_contract(memory, db, item["task_id"], digest)
         prior = memory.history(db, event)
+        selection = (select_policy(firewall, db, protection, artifact_checkout, contract)
+                     if protection and not prior else ("not_selected", None))
     if not prior:
         try:
-            result = inspect(contract, git, item["head_sha"], env)
+            manifest = selection[1]
+            result = inspect(contract, git, item["head_sha"], env,
+                             **({"policy": manifest["policy"]} if manifest else {}))
         except (GitUnavailable, OSError, ValueError):
             result = {"status": "ERROR", "reason": "git_evidence_unavailable"}
     with memory.transaction(write=True) as db:
@@ -241,13 +308,42 @@ def verify(memory, submission, digest, git, env):
             if prior[0]["data"]["fingerprint"] != fingerprint:
                 raise ValueError("Conflicting task event")
             return {"status": "INCONCLUSIVE", "reason": "duplicate_event"}
+        if memory.history(db, agent_event):
+            raise ValueError("Agent event already used by another verifier")
+        task_status = result["status"]
+        if protection:
+            current = select_policy(firewall, db, protection, artifact_checkout, contract)
+            if current != selection:
+                selection = (current[0] if current[1] is None else "unverified", None)
+            policy = policy_result(firewall, db, protection, selection, item, result)
+        else:
+            policy = {"state": "not_selected", "recurrence": False}
+        if after_correction:
+            link_correction(memory, db, item, after_correction, protection, rule=RULE)
+        state = policy["state"]
+        if state == "violated":
+            result["status"] = "POLICY_VIOLATION"
+        elif state in {"artifact_invalid", "conflict", "unsupported"} and task_status == "VERIFIED":
+            result["status"] = "ERROR"
+        elif state in {"unverified", "inactive"} and task_status == "VERIFIED":
+            result["status"] = "INCONCLUSIVE"
         report = {"version": 1, "rule": RULE, "task_id": item["task_id"], "event_id": item["event_id"],
-                  "project": item["project"], "requested_head_sha": item["head_sha"],
-                  "contract_digest": digest, "agent_declaration": {"agent": item["agent"], "complete": True},
-                  **result}
+                  "project": item["project"], "pr": item["pr"], "agent": item["agent"],
+                  "requested_head_sha": item["head_sha"], "contract_digest": digest,
+                  "agent_declaration": {"agent": item["agent"], "complete": True},
+                  "task_status": task_status, "policy": policy, **result}
+        report["evidence"] = ({"base_sha": result["base_sha"], "head_sha": result["observed_head_sha"]}
+                              if "observed_head_sha" in result else None)
+        report["protection"] = {"id": protection} if protection else None
+        report["operator_action"] = ("none" if result["status"] == "VERIFIED" else
+                                     "review_policy_violation" if state == "violated" else
+                                     "review_task_evidence")
+        if after_correction:
+            report["correction"] = {"authorized_event": after_correction, "verified": result["status"] == "VERIFIED"}
         report["evidence_id"] = identifier("task-evidence", report)
         memory.append(db, "task_verified", event, {"fingerprint": fingerprint, "report": report})
-        return report
+        memory.append(db, "agent_submission", agent_event, {"fingerprint": fingerprint, "journal": 2})
+        return record_report(memory, db, agent_event, report)
 
 
 def main():
@@ -259,6 +355,14 @@ def main():
     check = actions.add_parser("verify")
     check.add_argument("--checkout", required=True)
     check.add_argument("--digest", required=True)
+    check.add_argument("--protection")
+    check.add_argument("--artifact-checkout")
+    check.add_argument("--after-correction")
+    capture = actions.add_parser("finding")
+    capture.add_argument("--event-id", required=True)
+    failure = capture.add_mutually_exclusive_group(required=True)
+    failure.add_argument("--criterion-index", type=int)
+    failure.add_argument("--violation-index", type=int)
     disable = actions.add_parser("revoke")
     disable.add_argument("--task-id", required=True)
     disable.add_argument("--digest", required=True)
@@ -269,12 +373,17 @@ def main():
             result = approve(memory, read_json(32768), GitObjects(args.checkout))
         elif args.action == "revoke":
             result = revoke(memory, uuid_text(args.task_id), args.digest)
+        elif args.action == "finding":
+            result = capture_finding(memory, args.event_id, criterion_index=args.criterion_index,
+                                     violation_index=args.violation_index)
         else:
-            result = verify(memory, read_json(4096), args.digest, GitObjects(args.checkout), os.environ)
+            result = verify(memory, read_json(4096), args.digest, GitObjects(args.checkout), os.environ,
+                            protection=args.protection, artifact_checkout=args.artifact_checkout,
+                            after_correction=args.after_correction)
     except Exception:
         result = {"status": "ERROR", "reason": "task_contract_or_evidence_rejected"}
     print(json.dumps(result, ensure_ascii=True))
-    return {"APPROVED": 0, "REVOKED": 0, "VERIFIED": 0, "INCOMPLETE": 2,
+    return {"APPROVED": 0, "REVOKED": 0, "VERIFIED": 0, "FINDING_RECORDED": 0, "INCOMPLETE": 2,
             "POLICY_VIOLATION": 2}.get(result["status"], 1)
 
 

@@ -1,6 +1,7 @@
 """Local VERIFY → CONFIRM → LEARN → PREVENT alpha for public GitHub PRs."""
 import argparse
 from collections import Counter
+from hashlib import sha256
 import json
 import re
 import sqlite3
@@ -9,6 +10,7 @@ from uuid import uuid4
 
 from .scop_firewall_memory import FirewallError, Memory, artifact, canonical, identifier, project_key
 from .scop_github_evidence import GITHUB_READ
+from .scop_task_policy import CATEGORY as TASK_POLICY, VERSION as TASK_POLICY_VERSION
 from .scop_verify_syntax import RULE, verify_syntax
 
 VERIFIER_VERSION = "verify-v2"
@@ -149,13 +151,19 @@ class Firewall:
                           "files": "existing Python files eligible under VERIFY v2"},
                 "trigger": "REGRESSION_DETECTED",
             }
+            limitations = "Syntax only. Requires comparable BASE/HEAD evidence and the VERIFY compiler sandbox."
+            if finding["data"]["verifier_version"] == TASK_POLICY_VERSION:
+                data.update(category=TASK_POLICY, rule_version=TASK_POLICY_VERSION,
+                            scope={"repository": self.memory.repository},
+                            trigger="POLICY_VIOLATION", policy=finding["data"]["policy"])
+                limitations = "Static task policy. Requires an operator-selected contract and trusted Git objects."
             protection_id = identifier("p", data)
             if not self.memory.history(db, protection_id):
                 self.memory.append(db, "protection", protection_id, data)
             return {"protection_id": protection_id, "artifact": data,
                     "state": self._protection_state(self._events(db, protection_id, "protection"))["kind"],
                     "original_finding": finding["data"],
-                    "limitations": "Syntax only. Requires comparable BASE/HEAD evidence and the VERIFY compiler sandbox."}
+                    "limitations": limitations}
 
     def decide_protection(self, protection_id, decision, reason):
         reason = self._reason(reason)
@@ -202,10 +210,16 @@ class Firewall:
                 or finding[0]["data"]["head_sha"] != data["source_head_sha"]
                 or data["scope"]["repository"] != self.memory.repository):
             raise FirewallError("Protection has no matching confirmed finding for this project")
-        if (data["category"], data["rule_version"], data["version"]) != (
-            RULE, VERIFIER_VERSION, PROTECTION_VERSION
-        ):
+        if (data["category"], data["rule_version"], data["version"]) not in {
+            (RULE, VERIFIER_VERSION, PROTECTION_VERSION),
+            (TASK_POLICY, TASK_POLICY_VERSION, PROTECTION_VERSION),
+        }:
             return None
+        if data["category"] == TASK_POLICY and (
+            finding[0]["data"]["verifier_version"] != TASK_POLICY_VERSION
+            or finding[0]["data"].get("policy") != data.get("policy")
+        ):
+            raise FirewallError("Task policy does not match the confirmed finding")
         return {"protection_id": protection_id, **data, "approval": {
             "actor": approval["actor"], "time": approval["time"],
         }}
@@ -217,14 +231,17 @@ class Firewall:
                 raise FirewallError("Only an approved, active protection can be exported")
             path = artifact(checkout, protection_id, manifest)
             self.memory.append(db, "protection_exported", protection_id, {"version": manifest["version"]})
-            return {"path": path, "protection_id": protection_id}
+            result = {"path": path, "protection_id": protection_id}
+            if manifest["category"] == TASK_POLICY:
+                result["artifact_sha256"] = sha256(canonical(manifest) + b"\n").hexdigest()
+            return result
 
     def run(self, protection_id, checkout, url, permission, *, expected_head=None, on_record=None):
         pr = self._check_pr(url, permission)
         run_id = "r-" + uuid4().hex
         with self.memory.transaction(write=True) as db:
             manifest = self._active(db, protection_id)
-            if manifest is None:
+            if manifest is None or manifest["category"] != RULE:
                 result = {"status": "INAPPLICABLE", "reason": "Protection is inactive or unsupported"}
                 return self._record_run(db, run_id, protection_id, url, result, on_record)
             try:

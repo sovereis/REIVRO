@@ -50,7 +50,10 @@ def checked_feedback(memory, report, event_id, *, authorize=False):
             raise ValueError("Feedback does not match the operator journal")
         if not authorize:
             return saved
-        if saved["status"] != "VIOLATION_DETECTED" or not saved["evidence"]:
+        is_task = (saved.get("rule") == "task-completion-v1"
+                   and saved["status"] == "POLICY_VIOLATION"
+                   and saved.get("policy", {}).get("state") == "violated")
+        if (saved["status"] != "VIOLATION_DETECTED" and not is_task) or not saved["evidence"]:
             raise ValueError("Only an independently verified local violation is eligible")
         identifier = saved["protection"]["id"]
         if Firewall(memory)._active(db, identifier) is None:
@@ -62,17 +65,19 @@ def checked_feedback(memory, report, event_id, *, authorize=False):
             raise ValueError("Correction budget exhausted or already authorized")
         grant = {k: saved[k] for k in ("agent", "project", "task_id", "event_id", "pr", "requested_head_sha")}
         grant.update(protection_id=identifier, attempt=len(grants) + 1)
+        if is_task:
+            grant["rule"] = saved["rule"]
         memory.append(db, "correction_authorized", task_subject, grant)
         return {**saved, "feedback": {"version": 1, "decision": "correction_authorized",
                                       "attempt": grant["attempt"], "limit": CORRECTION_LIMIT}}
 
 
-def link_correction(memory, db, item, parent_event, protection_id):
+def link_correction(memory, db, item, parent_event, protection_id, *, rule=None):
     subject = "agent-task-" + item["task_id"]
     history = memory.history(db, subject)
     grant = next((entry["data"] for entry in history if entry["kind"] == "correction_authorized"
                   and entry["data"]["event_id"] == parent_event), None)
-    if (grant is None or any(grant[k] != item[k] for k in ("agent", "project", "task_id", "pr"))
+    if (grant is None or grant.get("rule") != rule or any(grant[k] != item[k] for k in ("agent", "project", "task_id", "pr"))
             or grant["requested_head_sha"] == item["head_sha"] or item["event_id"] == parent_event
             or grant["protection_id"] != protection_id
             or Firewall(memory)._active(db, protection_id) is None
