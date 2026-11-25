@@ -1,0 +1,10 @@
+#!/usr/bin/env -S python3 -I
+"""Run the REIVRO Developer Preview from a trusted source checkout."""
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from server.scop_preview import main
+
+raise SystemExit(main())

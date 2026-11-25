@@ -9,7 +9,7 @@ import subprocess
 import sys
 from time import monotonic
 
-from .scop_agent_feedback import link_correction, record_report
+from .scop_agent_feedback import link_correction, recorded_report, record_report
 from .scop_agent_integration import SHA, read_json, validate, uuid_text
 from .scop_firewall import Firewall
 from . import scop_task_policy as policy_rules
@@ -179,7 +179,7 @@ def cloud_evidence(criterion, contract, head, env):
         return None
 
 
-def inspect(contract, git, head, env, *, policy=None):
+def inspect(contract, git, head, env, *, policy=None, policies=None):
     if git.head() != head:
         return {"status": "INCONCLUSIVE", "reason": "head_mismatch"}
     base = contract["base_sha"]
@@ -215,13 +215,15 @@ def inspect(contract, git, head, env, *, policy=None):
         criteria.append({"index": index, "kind": kind,
                          "outcome": {True: "met", False: "unmet", None: "unverified"}[observed]})
     policy_paths = policy_rules.evaluate(policy, git, head, paths) if policy else []
+    policy_set_paths = {key: policy_rules.evaluate(rule, git, head, paths)
+                        for key, rule in (policies or {}).items()}
     if git.head() != head:
         return {"status": "INCONCLUSIVE", "reason": "head_moved"}
     outcomes = {criterion["outcome"] for criterion in criteria}
     status = ("POLICY_VIOLATION" if violations else "INCOMPLETE" if "unmet" in outcomes else
               "INCONCLUSIVE" if "unverified" in outcomes else "VERIFIED")
     return {"status": status, "base_sha": base, "observed_head_sha": head,
-            "criteria": criteria, "violations": violations, "policy_paths": policy_paths}
+            "criteria": criteria, "violations": violations, "policy_paths": policy_paths, "policy_set_paths": policy_set_paths}
 
 
 def capture_finding(memory, event_id, *, criterion_index=None, violation_index=None):
@@ -275,11 +277,37 @@ def policy_result(firewall, db, protection, selection, item, result):
             "source_evidence_id": source["evidence_id"]}
 
 
+def project_selection(firewall, db, checkout, contract):
+    """Resolve the operator's active local task policies in stable order."""
+    selections = {}
+    digests = {}
+    for subject, data in db.execute(
+        "SELECT subject, data FROM events WHERE kind = 'protection' ORDER BY subject"
+    ):
+        if json.loads(data)["category"] != policy_rules.CATEGORY:
+            continue
+        state, manifest = select_policy(firewall, db, subject, checkout, contract)
+        if state == "inactive":
+            history = firewall._events(db, subject, "protection")
+            if firewall._protection_state(history)["kind"] != "protection_approved":
+                continue
+            state = "unsupported"
+        selections[subject] = (state, manifest)
+        rule = manifest["policy"] if manifest else {}
+        if rule.get("kind") == "blob_sha256":
+            digests.setdefault(rule["path"], set()).add(rule["digest"])
+    for subject, (state, manifest) in selections.items():
+        rule = manifest["policy"] if manifest else {}
+        if rule.get("kind") == "blob_sha256" and len(digests[rule["path"]]) > 1:
+            selections[subject] = ("conflict", None)
+    return selections
+
+
 def verify(memory, submission, digest, git, env, *, protection=None, artifact_checkout=None,
-           after_correction=None):
+           after_correction=None, project_policies=False):
     item = validate(submission)
-    if (item["project"] != memory.repository or bool(protection) != bool(artifact_checkout)
-            or after_correction and not protection or protection is not None and
+    if (item["project"] != memory.repository or bool(protection or project_policies) != bool(artifact_checkout)
+            or project_policies and protection or after_correction and not (protection or project_policies) or protection is not None and
             not re.fullmatch(r"p-[0-9a-f]{64}", protection)):
         raise ValueError("Invalid operator policy selection or project")
     event = "task-event-" + item["event_id"]
@@ -287,6 +315,8 @@ def verify(memory, submission, digest, git, env, *, protection=None, artifact_ch
     identity = [item, digest]
     if protection:
         identity.extend([protection, uuid_text(after_correction) if after_correction else None])
+    if project_policies:
+        identity.extend(["project-task-policies", uuid_text(after_correction) if after_correction else None])
     fingerprint = identifier("submission", identity)
     firewall = Firewall(memory)
     with memory.transaction() as db:
@@ -294,11 +324,15 @@ def verify(memory, submission, digest, git, env, *, protection=None, artifact_ch
         prior = memory.history(db, event)
         selection = (select_policy(firewall, db, protection, artifact_checkout, contract)
                      if protection and not prior else ("not_selected", None))
+        selections = (project_selection(firewall, db, artifact_checkout, contract)
+                      if project_policies and not prior else {})
     if not prior:
         try:
             manifest = selection[1]
             result = inspect(contract, git, item["head_sha"], env,
-                             **({"policy": manifest["policy"]} if manifest else {}))
+                             **({"policy": manifest["policy"]} if manifest else {}),
+                             **({"policies": {key: entry[1]["policy"] for key, entry in selections.items()
+                                              if entry[1]}} if project_policies else {}))
         except (GitUnavailable, OSError, ValueError):
             result = {"status": "ERROR", "reason": "git_evidence_unavailable"}
     with memory.transaction(write=True) as db:
@@ -311,7 +345,31 @@ def verify(memory, submission, digest, git, env, *, protection=None, artifact_ch
         if memory.history(db, agent_event):
             raise ValueError("Agent event already used by another verifier")
         task_status = result["status"]
-        if protection:
+        paths = result.pop("policy_set_paths", {})
+        policies = []
+        if project_policies:
+            current_set = project_selection(firewall, db, artifact_checkout, contract)
+            for key in sorted(selections.keys() | current_set.keys()):
+                current = current_set.get(key, ("inactive", None))
+                if current != selections.get(key) and current[1] is not None:
+                    current = ("unverified", None)
+                observation = {**result, "policy_paths": paths.get(key, ())}
+                policies.append(policy_result(firewall, db, key, current, item, observation))
+            violations = [entry for entry in policies if entry["state"] == "violated"]
+            unresolved = [entry for entry in policies if entry["state"] not in {"clear", "violated"}]
+            policy = (violations[0] if len(violations) == 1 and not unresolved else
+                      unresolved[0] if unresolved else
+                      {"state": "violated" if violations else "clear",
+                       "recurrence": any(entry["recurrence"] for entry in violations)})
+            result.pop("policy_paths", None)
+            if after_correction:
+                parent = recorded_report(memory, db, "agent-event-" + after_correction)
+                protection = ((parent or {}).get("protection") or {}).get("id")
+                if not protection or not any(entry["id"] == protection for entry in policies):
+                    raise ValueError("Correction protection unavailable in the selected set")
+            elif len(violations) == 1 and not unresolved:
+                protection = policy["id"]
+        elif protection:
             current = select_policy(firewall, db, protection, artifact_checkout, contract)
             if current != selection:
                 selection = (current[0] if current[1] is None else "unverified", None)
@@ -321,7 +379,7 @@ def verify(memory, submission, digest, git, env, *, protection=None, artifact_ch
         if after_correction:
             link_correction(memory, db, item, after_correction, protection, rule=RULE)
         state = policy["state"]
-        if state == "violated":
+        if state == "violated" or any(entry["state"] == "violated" for entry in policies):
             result["status"] = "POLICY_VIOLATION"
         elif state in {"artifact_invalid", "conflict", "unsupported"} and task_status == "VERIFIED":
             result["status"] = "ERROR"
@@ -334,6 +392,8 @@ def verify(memory, submission, digest, git, env, *, protection=None, artifact_ch
                   "task_status": task_status, "policy": policy, **result}
         report["evidence"] = ({"base_sha": result["base_sha"], "head_sha": result["observed_head_sha"]}
                               if "observed_head_sha" in result else None)
+        if project_policies:
+            report["policies"] = policies
         report["protection"] = {"id": protection} if protection else None
         report["operator_action"] = ("none" if result["status"] == "VERIFIED" else
                                      "review_policy_violation" if state == "violated" else

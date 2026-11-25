@@ -21,6 +21,10 @@ The Rework Firewall is a product direction, not an implemented end-to-end guaran
 
 See [product direction and capability boundaries](docs/PRODUCT.md).
 
+## Developer Preview V0.1
+
+Use the [local Developer Preview quickstart](docs/DEVELOPER_PREVIEW.md) for operator-approved task verification and reusable project protections.
+
 ## Quick start on Linux or Windows with WSL
 
 1. On Windows, open PowerShell and run `wsl --install -d Ubuntu` if WSL is not installed. Restart if prompted, then launch **Ubuntu**. Run the commands below in Ubuntu (Bash). On Linux, use your regular terminal.
