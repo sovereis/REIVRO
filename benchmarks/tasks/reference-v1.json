@@ -1,0 +1,257 @@
+{
+  "version": 1,
+  "code_sha": "18a1fc452360b334b54682d46037f4778cf3b30d",
+  "manifest_sha256": "9f841f104dbfab488b9af80a47e8637debc5bb02245f3aa3e4324adbc854f8af",
+  "repetitions": 3,
+  "source": "synthetic tasks on local Git commits",
+  "matched": 30,
+  "incomplete_detected": 12,
+  "false_positive": 0,
+  "false_negative": 0,
+  "inconclusive": 6,
+  "scope_violations": 6,
+  "median_ms": 26.761,
+  "p95_ms": 31.221,
+  "results": [
+    {
+      "id": "complete",
+      "expected": "VERIFIED",
+      "truth_incomplete": false,
+      "status": "VERIFIED",
+      "repetition": 1,
+      "elapsed_ms": 28.024
+    },
+    {
+      "id": "partial",
+      "expected": "INCOMPLETE",
+      "truth_incomplete": true,
+      "status": "INCOMPLETE",
+      "repetition": 1,
+      "elapsed_ms": 25.116
+    },
+    {
+      "id": "unchanged",
+      "expected": "INCOMPLETE",
+      "truth_incomplete": true,
+      "status": "INCOMPLETE",
+      "repetition": 1,
+      "elapsed_ms": 15.817
+    },
+    {
+      "id": "missing",
+      "expected": "INCOMPLETE",
+      "truth_incomplete": true,
+      "status": "INCOMPLETE",
+      "repetition": 1,
+      "elapsed_ms": 21.854
+    },
+    {
+      "id": "protected",
+      "expected": "POLICY_VIOLATION",
+      "truth_incomplete": null,
+      "status": "POLICY_VIOLATION",
+      "repetition": 1,
+      "elapsed_ms": 27.918
+    },
+    {
+      "id": "out_of_scope",
+      "expected": "POLICY_VIOLATION",
+      "truth_incomplete": null,
+      "status": "POLICY_VIOLATION",
+      "repetition": 1,
+      "elapsed_ms": 26.831
+    },
+    {
+      "id": "false_evidence",
+      "expected": "INCOMPLETE",
+      "truth_incomplete": true,
+      "status": "INCOMPLETE",
+      "repetition": 1,
+      "elapsed_ms": 27.582
+    },
+    {
+      "id": "head_diverged",
+      "expected": "INCONCLUSIVE",
+      "truth_incomplete": null,
+      "status": "INCONCLUSIVE",
+      "repetition": 1,
+      "elapsed_ms": 5.269
+    },
+    {
+      "id": "manual_criterion",
+      "expected": "INCONCLUSIVE",
+      "truth_incomplete": null,
+      "status": "INCONCLUSIVE",
+      "repetition": 1,
+      "elapsed_ms": 31.221
+    },
+    {
+      "id": "contract_changed",
+      "expected": "ERROR",
+      "truth_incomplete": null,
+      "status": "ERROR",
+      "repetition": 1,
+      "elapsed_ms": 3.041
+    },
+    {
+      "id": "complete",
+      "expected": "VERIFIED",
+      "truth_incomplete": false,
+      "status": "VERIFIED",
+      "repetition": 2,
+      "elapsed_ms": 27.62
+    },
+    {
+      "id": "partial",
+      "expected": "INCOMPLETE",
+      "truth_incomplete": true,
+      "status": "INCOMPLETE",
+      "repetition": 2,
+      "elapsed_ms": 31.09
+    },
+    {
+      "id": "unchanged",
+      "expected": "INCOMPLETE",
+      "truth_incomplete": true,
+      "status": "INCOMPLETE",
+      "repetition": 2,
+      "elapsed_ms": 16.392
+    },
+    {
+      "id": "missing",
+      "expected": "INCOMPLETE",
+      "truth_incomplete": true,
+      "status": "INCOMPLETE",
+      "repetition": 2,
+      "elapsed_ms": 20.664
+    },
+    {
+      "id": "protected",
+      "expected": "POLICY_VIOLATION",
+      "truth_incomplete": null,
+      "status": "POLICY_VIOLATION",
+      "repetition": 2,
+      "elapsed_ms": 27.32
+    },
+    {
+      "id": "out_of_scope",
+      "expected": "POLICY_VIOLATION",
+      "truth_incomplete": null,
+      "status": "POLICY_VIOLATION",
+      "repetition": 2,
+      "elapsed_ms": 27.532
+    },
+    {
+      "id": "false_evidence",
+      "expected": "INCOMPLETE",
+      "truth_incomplete": true,
+      "status": "INCOMPLETE",
+      "repetition": 2,
+      "elapsed_ms": 28.095
+    },
+    {
+      "id": "head_diverged",
+      "expected": "INCONCLUSIVE",
+      "truth_incomplete": null,
+      "status": "INCONCLUSIVE",
+      "repetition": 2,
+      "elapsed_ms": 5.467
+    },
+    {
+      "id": "manual_criterion",
+      "expected": "INCONCLUSIVE",
+      "truth_incomplete": null,
+      "status": "INCONCLUSIVE",
+      "repetition": 2,
+      "elapsed_ms": 30.607
+    },
+    {
+      "id": "contract_changed",
+      "expected": "ERROR",
+      "truth_incomplete": null,
+      "status": "ERROR",
+      "repetition": 2,
+      "elapsed_ms": 2.897
+    },
+    {
+      "id": "complete",
+      "expected": "VERIFIED",
+      "truth_incomplete": false,
+      "status": "VERIFIED",
+      "repetition": 3,
+      "elapsed_ms": 26.427
+    },
+    {
+      "id": "partial",
+      "expected": "INCOMPLETE",
+      "truth_incomplete": true,
+      "status": "INCOMPLETE",
+      "repetition": 3,
+      "elapsed_ms": 35.315
+    },
+    {
+      "id": "unchanged",
+      "expected": "INCOMPLETE",
+      "truth_incomplete": true,
+      "status": "INCOMPLETE",
+      "repetition": 3,
+      "elapsed_ms": 16.819
+    },
+    {
+      "id": "missing",
+      "expected": "INCOMPLETE",
+      "truth_incomplete": true,
+      "status": "INCOMPLETE",
+      "repetition": 3,
+      "elapsed_ms": 20.518
+    },
+    {
+      "id": "protected",
+      "expected": "POLICY_VIOLATION",
+      "truth_incomplete": null,
+      "status": "POLICY_VIOLATION",
+      "repetition": 3,
+      "elapsed_ms": 26.69
+    },
+    {
+      "id": "out_of_scope",
+      "expected": "POLICY_VIOLATION",
+      "truth_incomplete": null,
+      "status": "POLICY_VIOLATION",
+      "repetition": 3,
+      "elapsed_ms": 29.91
+    },
+    {
+      "id": "false_evidence",
+      "expected": "INCOMPLETE",
+      "truth_incomplete": true,
+      "status": "INCOMPLETE",
+      "repetition": 3,
+      "elapsed_ms": 29.143
+    },
+    {
+      "id": "head_diverged",
+      "expected": "INCONCLUSIVE",
+      "truth_incomplete": null,
+      "status": "INCONCLUSIVE",
+      "repetition": 3,
+      "elapsed_ms": 5.311
+    },
+    {
+      "id": "manual_criterion",
+      "expected": "INCONCLUSIVE",
+      "truth_incomplete": null,
+      "status": "INCONCLUSIVE",
+      "repetition": 3,
+      "elapsed_ms": 28.337
+    },
+    {
+      "id": "contract_changed",
+      "expected": "ERROR",
+      "truth_incomplete": null,
+      "status": "ERROR",
+      "repetition": 3,
+      "elapsed_ms": 2.17
+    }
+  ]
+}
