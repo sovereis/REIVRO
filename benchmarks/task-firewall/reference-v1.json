@@ -1,0 +1,150 @@
+{
+  "code_sha": "b7644836a37be714b0359ed5152da919b58c3eb4",
+  "matched": 15,
+  "incomplete": 3,
+  "policy_violations": 3,
+  "confirmed_recurrences": 3,
+  "false_positive": 0,
+  "false_negative": 0,
+  "inconclusive": 3,
+  "median_ms": 81.677,
+  "p95_ms": 104.813,
+  "blocking_exercised": false,
+  "results": [
+    {
+      "scenario": "original_incomplete",
+      "status": "INCOMPLETE",
+      "expected": "INCOMPLETE",
+      "recurrence": false,
+      "expected_recurrence": false,
+      "truth_policy_violation": null,
+      "elapsed_ms": 96.275
+    },
+    {
+      "scenario": "cross_task_recurrence",
+      "status": "POLICY_VIOLATION",
+      "expected": "POLICY_VIOLATION",
+      "recurrence": true,
+      "expected_recurrence": true,
+      "truth_policy_violation": true,
+      "elapsed_ms": 50.952
+    },
+    {
+      "scenario": "authorized_correction",
+      "status": "VERIFIED",
+      "expected": "VERIFIED",
+      "recurrence": false,
+      "expected_recurrence": false,
+      "truth_policy_violation": false,
+      "elapsed_ms": 81.677
+    },
+    {
+      "scenario": "artifact_tampered",
+      "status": "ERROR",
+      "expected": "ERROR",
+      "recurrence": false,
+      "expected_recurrence": false,
+      "truth_policy_violation": null,
+      "elapsed_ms": 34.95
+    },
+    {
+      "scenario": "revoked",
+      "status": "INCONCLUSIVE",
+      "expected": "INCONCLUSIVE",
+      "recurrence": false,
+      "expected_recurrence": false,
+      "truth_policy_violation": null,
+      "elapsed_ms": 81.459
+    },
+    {
+      "scenario": "original_incomplete",
+      "status": "INCOMPLETE",
+      "expected": "INCOMPLETE",
+      "recurrence": false,
+      "expected_recurrence": false,
+      "truth_policy_violation": null,
+      "elapsed_ms": 83.175
+    },
+    {
+      "scenario": "cross_task_recurrence",
+      "status": "POLICY_VIOLATION",
+      "expected": "POLICY_VIOLATION",
+      "recurrence": true,
+      "expected_recurrence": true,
+      "truth_policy_violation": true,
+      "elapsed_ms": 95.006
+    },
+    {
+      "scenario": "authorized_correction",
+      "status": "VERIFIED",
+      "expected": "VERIFIED",
+      "recurrence": false,
+      "expected_recurrence": false,
+      "truth_policy_violation": false,
+      "elapsed_ms": 104.813
+    },
+    {
+      "scenario": "artifact_tampered",
+      "status": "ERROR",
+      "expected": "ERROR",
+      "recurrence": false,
+      "expected_recurrence": false,
+      "truth_policy_violation": null,
+      "elapsed_ms": 91.73
+    },
+    {
+      "scenario": "revoked",
+      "status": "INCONCLUSIVE",
+      "expected": "INCONCLUSIVE",
+      "recurrence": false,
+      "expected_recurrence": false,
+      "truth_policy_violation": null,
+      "elapsed_ms": 84.42
+    },
+    {
+      "scenario": "original_incomplete",
+      "status": "INCOMPLETE",
+      "expected": "INCOMPLETE",
+      "recurrence": false,
+      "expected_recurrence": false,
+      "truth_policy_violation": null,
+      "elapsed_ms": 32.218
+    },
+    {
+      "scenario": "cross_task_recurrence",
+      "status": "POLICY_VIOLATION",
+      "expected": "POLICY_VIOLATION",
+      "recurrence": true,
+      "expected_recurrence": true,
+      "truth_policy_violation": true,
+      "elapsed_ms": 93.508
+    },
+    {
+      "scenario": "authorized_correction",
+      "status": "VERIFIED",
+      "expected": "VERIFIED",
+      "recurrence": false,
+      "expected_recurrence": false,
+      "truth_policy_violation": false,
+      "elapsed_ms": 39.066
+    },
+    {
+      "scenario": "artifact_tampered",
+      "status": "ERROR",
+      "expected": "ERROR",
+      "recurrence": false,
+      "expected_recurrence": false,
+      "truth_policy_violation": null,
+      "elapsed_ms": 56.307
+    },
+    {
+      "scenario": "revoked",
+      "status": "INCONCLUSIVE",
+      "expected": "INCONCLUSIVE",
+      "recurrence": false,
+      "expected_recurrence": false,
+      "truth_policy_violation": null,
+      "elapsed_ms": 35.523
+    }
+  ]
+}
