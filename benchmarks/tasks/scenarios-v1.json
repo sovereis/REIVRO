@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "seed": null,
+  "cases": [
+    {"id":"complete","expected":"VERIFIED","truth_incomplete":false},
+    {"id":"partial","expected":"INCOMPLETE","truth_incomplete":true},
+    {"id":"unchanged","expected":"INCOMPLETE","truth_incomplete":true},
+    {"id":"missing","expected":"INCOMPLETE","truth_incomplete":true},
+    {"id":"protected","expected":"POLICY_VIOLATION","truth_incomplete":null},
+    {"id":"out_of_scope","expected":"POLICY_VIOLATION","truth_incomplete":null},
+    {"id":"false_evidence","expected":"INCOMPLETE","truth_incomplete":true},
+    {"id":"head_diverged","expected":"INCONCLUSIVE","truth_incomplete":null},
+    {"id":"manual_criterion","expected":"INCONCLUSIVE","truth_incomplete":null},
+    {"id":"contract_changed","expected":"ERROR","truth_incomplete":null}
+  ]
+}
