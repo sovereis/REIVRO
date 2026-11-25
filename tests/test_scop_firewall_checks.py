@@ -179,7 +179,15 @@ def test_finish_report_matches_hosted_pr_contract(pg, monkeypatch):
     assert client.dispatch("finish", request) == {"run_id": claim["run_id"], "outcome": "OBSERVED"}
 
 
-def test_isolated_cloud_and_checks_lifecycle(pg, monkeypatch, tmp_path):
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_isolated_cloud_and_checks_lifecycle(pg, monkeypatch, tmp_path, dry_run):
+    offset = 200 if dry_run else 0
+
+    def rev(number):
+        return revision(number + offset)
+
+    def signed(number):
+        return delivery(number + offset)
     # Auth subjects and GitHub responses are fixtures. PostgreSQL, RLS and the
     # VERIFY subprocess are real. No token, webhook or Check is sent to GitHub.
     scope = {"repository_id": 101, "installation_id": 201}
@@ -197,22 +205,23 @@ def test_isolated_cloud_and_checks_lifecycle(pg, monkeypatch, tmp_path):
 
     def verify_fetch(url, deadline):
         for number in range(1, 8):
-            rev = revision(number)
-            endpoint = f"https://api.github.com/repos/example/fixture/pulls/{number}"
+            ref = rev(number)
+            pr = ref.pr
+            endpoint = f"https://api.github.com/repos/example/fixture/pulls/{pr}"
             path = "first.py" if number == 1 else "later.py"
             old = contents(path, b"x = 1\n")
             line = b"x = 2" if number == 3 else b"x = )"
             new = contents(path, line + b"\n")
             if url == endpoint:
-                return {**metadata(rev), "changed_files": 1,
-                        "html_url": f"https://github.com/example/fixture/pull/{number}"}
+                return {**metadata(ref), "changed_files": 1,
+                        "html_url": f"https://github.com/example/fixture/pull/{pr}"}
             if url == endpoint + "/files?per_page=100&page=1":
                 return [{"filename": path, "status": "modified", "additions": 1, "deletions": 1,
                          "sha": new["sha"], "patch": "@@ -1 +1 @@\n-x = 1\n+" + line.decode()}]
             prefix = "https://api.github.com/repos/example/fixture/contents/"
-            if url == f"{prefix}{path}?ref={rev.base_sha}":
+            if url == f"{prefix}{path}?ref={ref.base_sha}":
                 return old
-            if url == f"{prefix}{path}?ref={rev.head_sha}":
+            if url == f"{prefix}{path}?ref={ref.head_sha}":
                 return new
         raise AssertionError("unexpected evidence endpoint")
 
@@ -237,12 +246,16 @@ def test_isolated_cloud_and_checks_lifecycle(pg, monkeypatch, tmp_path):
     monkeypatch.setattr(checks, "_request", transport)
 
     def send(number, replay=None):
-        response = checks.handle(*(replay or delivery(number)), project=PROJECT, secret=SECRET,
-                                 memory=Memory(), github=checks.GitHub("fixture-installation", PROJECT))
-        return response
+        args = replay or signed(number)
+        if dry_run:
+            return checks.analyze(*args, project=PROJECT, secret=SECRET, memory=memory,
+                                  github=checks.GitHubEvidence("fixture-installation", PROJECT),
+                                  executor=execute, durable=True)
+        return checks.handle(*args, project=PROJECT, secret=SECRET,
+                             memory=Memory(), github=checks.GitHub("fixture-installation", PROJECT))
 
     queue = pilot.Queue(tmp_path / "deliveries.sqlite")
-    body, signature, key, event = delivery(1)
+    body, signature, key, event = signed(1)
     pilot.accept_delivery(queue, PROJECT, SECRET, body, signature, key, event)
     memory = checks.StagingMemory("lbklqqqbmeyseeccdqog", "sb_publishable_fixture", "fixture-worker")
     compiled = []
@@ -251,20 +264,25 @@ def test_isolated_cloud_and_checks_lifecycle(pg, monkeypatch, tmp_path):
         compiled.append(source)
         return syntax._compile(source, deadline)
 
-    assert pilot.process(queue, PROJECT, SECRET, memory,
-                         checks.GitHubEvidence("fixture-installation", PROJECT), executor=execute)
+    if dry_run:
+        original = send(1, (body, signature, key, event))
+        assert original["status"] == "OBSERVED"
+    else:
+        assert pilot.process(queue, PROJECT, SECRET, memory,
+                             checks.GitHubEvidence("fixture-installation", PROJECT), executor=execute)
+        with closing(queue.connect()) as db:
+            saved = json.loads(db.execute("SELECT result FROM deliveries WHERE id=?", (key,)).fetchone()[0])
+        assert not published
+        original = checks.publish_result(saved, checks.GitHub("fixture-installation", PROJECT))
+        assert original["status"] == "OBSERVED" and published[-1]["conclusion"] == "neutral"
     assert compiled == [b"x = 1\n", b"x = )\n"]
-    assert published == []
-    with closing(queue.connect()) as db:
-        saved = json.loads(db.execute("SELECT result FROM deliveries WHERE id=?", (key,)).fetchone()[0])
-    original = checks.publish_result(saved, checks.GitHub("fixture-installation", PROJECT))
-    assert original["status"] == "OBSERVED" and published[-1]["conclusion"] == "neutral"
+
     def read_run(actor):
         return pg(f"begin; set local role authenticated; set local request.jwt.claim.sub = '{actor}'; "
                   f"select reivro_checks_api.read_run(101, '{original['run_id']}'); commit;")
     assert read_run(OTHER) == read_run(WORKER) == ""
     inspected = json.loads(read_run(REVIEWER))
-    assert inspected["run"]["head_sha"] == revision(1).head_sha
+    assert inspected["run"]["head_sha"] == rev(1).head_sha
     finding = inspected["findings"][0]["id"]
     request = {**scope, "subject": finding, "reason": "Reviewed the pinned evidence"}
     for actor in (None, OTHER, WORKER):
@@ -298,30 +316,45 @@ def test_isolated_cloud_and_checks_lifecycle(pg, monkeypatch, tmp_path):
         subprocess.run(["git", "-c", "init.templateDir=", "init", "-q", directory], check=True)
         subprocess.run(["git", "-C", directory, "add", "--", checks.ARTIFACT], check=True)
         approved = subprocess.check_output(["git", "-C", directory, "show", ":" + checks.ARTIFACT])
-    trust.update({revision(number).base_sha: approved for number in (2, 3, 4, 5, 6)})
-    second = delivery(2)
+    trust.update({rev(number).base_sha: approved for number in (2, 3, 4, 5, 6)})
+    second = signed(2)
     result = send(2, second)
-    assert result["status"] == "VIOLATION" and published[-1]["conclusion"] == "failure"
-    assert published[-1]["head_sha"] == revision(2).head_sha
-    assert published[-1]["external_id"] == result["run_id"]
+    assert result["status"] == "VIOLATION"
+    assert result["head_sha"] == rev(2).head_sha
+    if not dry_run:
+        assert published[-1]["conclusion"] == "failure"
+        assert published[-1]["head_sha"] == rev(2).head_sha
+        assert published[-1]["external_id"] == result["run_id"]
     before = len(published)
-    assert send(2, second)["status"] == send(2)["status"] == "DUPLICATE"
+    repeated = "COMPLETED" if dry_run else "DUPLICATE"
+    assert send(2, second)["status"] == send(2)["status"] == repeated
     assert len(published) == before
     assert send(3)["status"] == "PASS"
-    trust[revision(4).base_sha] += b" "
+    trust[rev(4).base_sha] += b" "
     assert send(4)["status"] == "INCONCLUSIVE"
-    assert published[-1]["conclusion"] == "neutral"
+    if not dry_run:
+        assert published[-1]["conclusion"] == "neutral"
 
     # Revoke between claim and finish. The worker cannot finalize a violation.
     real_finish = Memory.dispatch
     def revoke_on_finish(self, action, request):
-        if action == "finish":
+        if action in {"finish", "finish_durable"}:
             assert rpc(pg, REVIEWER, "revoke", approval)["action"] == "revoke"
         return real_finish(self, action, request)
     with monkeypatch.context() as patch:
-        patch.setattr(Memory, "dispatch", revoke_on_finish)
+        if dry_run:
+            def transport_with_revocation(method, url, headers, payload=None, limit=None):
+                if payload and payload.get("action") == "finish_durable":
+                    assert rpc(pg, REVIEWER, "revoke", approval)["action"] == "revoke"
+                return transport(method, url, headers, payload, limit)
+
+            patch.setattr(checks, "_request", transport_with_revocation)
+        else:
+            patch.setattr(Memory, "dispatch", revoke_on_finish)
         assert send(5)["status"] == "INACTIVE"
     assert send(6)["status"] == "OBSERVED"
+    if dry_run:
+        assert not published
     assert "Denied" in rpc(pg, REVIEWER, "approve", approval, valid=False)
 
     # A role claim alone is not authority. Users see records only in their project.
@@ -335,20 +368,30 @@ def test_isolated_cloud_and_checks_lifecycle(pg, monkeypatch, tmp_path):
     assert "permission denied" in denied_write
     assert "Denied" in rpc(pg, WORKER, "claim", {
         **scope, "repository_id": 102, "repository": "example/other", "base_ref": "main",
-        "delivery": str(uuid4()), "pr": 1, "base_sha": revision(1).base_sha, "head_sha": revision(1).head_sha,
+        "delivery": str(uuid4()), "pr": 1, "base_sha": revision(1).base_sha, "head_sha": rev(1).head_sha,
     }, valid=False)
 
 
     def claim_once(delivery_id):
         return rpc(pg, WORKER, "claim", {
             **scope, "repository": "example/fixture", "base_ref": "main", "delivery": delivery_id,
-            "pr": 7, "base_sha": revision(7).base_sha, "head_sha": revision(7).head_sha,
+            "pr": rev(7).pr, "base_sha": rev(7).base_sha, "head_sha": rev(7).head_sha,
         })
 
     with ThreadPoolExecutor(2) as pool:
         claims = list(pool.map(claim_once, (str(uuid4()), str(uuid4()))))
     assert sum(c.get("duplicate") is True for c in claims) == 1
     assert sum("run_id" in c for c in claims) == 1
+    if dry_run:
+        project_id = "10000000-0000-0000-0000-000000000001"
+        pg(f"delete from reivro_cloud.memberships where project_id = '{project_id}' "
+           f"and user_id = '{REVIEWER}';")
+        try:
+            assert read_run(REVIEWER) == ""
+            assert "Denied" in rpc(pg, REVIEWER, "confirm", request, valid=False)
+        finally:
+            pg(f"insert into reivro_cloud.memberships values ('{project_id}', '{REVIEWER}', 'reviewer');")
+
 
 
 @pytest.mark.parametrize(("provider_status", "status", "conclusion"), [
