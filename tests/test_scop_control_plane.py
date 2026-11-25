@@ -162,3 +162,55 @@ def test_trusted_worker_verified_result_and_worker_cannot_confirm(pg,case):
     assert call(pg,agent,'read',data)['result']['status']=='VERIFIED'
     assert 'Denied' in call(pg,WORKER,'confirm',data,False)
     assert 'completed' in finish(pg,request,lease,'VERIFIED',False)
+
+
+@pytest.mark.parametrize('syntax_state', ['running', 'completed', 'task_first'])
+def test_syntax_and_task_on_same_revision_are_independent(pg, case, syntax_state):
+    from test_scop_firewall_checks import rpc
+    agent, _, _, _, data = case
+    call(pg, agent, 'submit', data)
+    request = {**data, 'repository': 'example/fixture', 'base_ref': 'main',
+               'installation_id': 201, 'delivery': str(uuid4()),
+               'pr': int(uuid4().hex[:6], 16) + 10000,
+               'base_sha': 'a' * 40, 'verifier': 'task-completion-v1'}
+    if syntax_state == 'task_first':
+        task_lease = call(pg, WORKER, 'claim', request)
+    syntax_lease = rpc(pg, WORKER, 'claim_durable', request)
+    if syntax_state == 'completed':
+        rpc(pg, WORKER, 'finish_durable', {**request, **syntax_lease,
+            'report': {'status': 'INCONCLUSIVE', 'rule': 'python-syntax-regression',
+                       'verifier_version': 'verify-v2'}})
+    if syntax_state != 'task_first':
+        task_lease = call(pg, WORKER, 'claim', request)
+    assert task_lease['state'] == 'running'
+    assert task_lease['run_id'] != syntax_lease['run_id']
+    assert 'Denied' in rpc(pg, WORKER, 'renew_durable', {**request, **task_lease}, valid=False)
+    assert finish(pg, request, task_lease, 'VERIFIED')['result']['status'] == 'VERIFIED'
+    assert rpc(pg, WORKER, 'claim_durable', request)['state'] == (
+        'completed' if syntax_state == 'completed' else 'busy')
+
+
+def test_distinct_contracts_same_revision_do_not_share_execution(pg, case):
+    agent, _, _, contract, first = case
+    second_contract = {**contract, 'id': str(uuid4())}
+    call(pg, REVIEWER, 'approve_contract', second_contract)
+    second = {**first, 'id': str(uuid4()), 'contract_id': second_contract['id']}
+    call(pg, agent, 'submit', first)
+    call(pg, agent, 'submit', second)
+    request, lease = claim(pg, first)
+    second_request = {**request, **second}
+    with ThreadPoolExecutor(2) as pool:
+        claims = list(pool.map(lambda _: call(pg, WORKER, 'claim', second_request), range(2)))
+    assert sorted(item['state'] for item in claims) == ['busy', 'running']
+    other_lease = next(item for item in claims if item['state'] == 'running')
+    assert other_lease['run_id'] != lease['run_id']
+    assert finish(pg, request, lease, 'VERIFIED')['result']['status'] == 'VERIFIED'
+    assert call(pg, REVIEWER, 'read', second)['result'] is None
+    assert finish(pg, second_request, other_lease)['result']['status'] == 'INCOMPLETE'
+    assert call(pg, WORKER, 'claim', request)['state'] == 'completed'
+
+
+def test_incremental_upgrade_preserves_existing_syntax_run(pg):
+    assert pg("select outcome || ':' || (report->>'fixture') from reivro_cloud.runs "
+              "where id='90000000-0000-0000-0000-000000000002' and task_submission_id is null;") == (
+                  'INCONCLUSIVE:history-before-003')

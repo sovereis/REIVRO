@@ -46,6 +46,15 @@ SQL
 psql < supabase/staging/001_firewall.sql
 bash ops/vercel-pilot/staging/manage.sh render-002 | psql
 if (( control_plane )); then
+    # Seed history under the old schema to exercise the actual incremental upgrade.
+    psql <<'SQL'
+insert into reivro_cloud.projects(id,repository_id,repository,installation_id,trusted_base)
+ values('90000000-0000-0000-0000-000000000001',899,'example/pre003',899,'main');
+insert into reivro_cloud.runs(project_id,id,delivery,worker,pr,base_ref,base_sha,head_sha,outcome,report)
+ values('90000000-0000-0000-0000-000000000001','90000000-0000-0000-0000-000000000002',
+ '90000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000001',1,'main',
+ repeat('a',40),repeat('b',40),'INCONCLUSIVE','{"fixture":"history-before-003"}');
+SQL
     psql < supabase/staging/003_control_plane.sql
 fi
 psql <<'SQL'
