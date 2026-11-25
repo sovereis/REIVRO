@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # Disposable PostgreSQL only. Does not use remote DB URLs or Supabase credentials.
 set -euo pipefail
+if (( $# != 0 )) && [[ "${1:-}" != "--benchmark" || $# != 2 || -z "$2" ]]; then
+  echo "Usage: $0 [--benchmark OUTPUT_DIRECTORY]" >&2
+  exit 2
+fi
+if (( $# == 2 )); then
+  output="$(realpath -m -- "$2")"
+fi
 cd "$(dirname "$0")/.."
 name="reivro-staging-test-$$"
 image="postgres:17"
@@ -57,5 +64,9 @@ if psql -v installation_id=205 -v worker_id="$worker" < "$binding" >/dev/null 2>
     exit 1
 fi
 [[ "$(psql -c "select count(*) from reivro_cloud.projects p join reivro_cloud.memberships m on m.project_id=p.id where p.repository_id=1469495108 and p.installation_id=204 and m.role='worker' and m.user_id='$worker'")" == 1 ]]
-REIVRO_LOCAL_TEST_POSTGRES="$name" PYTHONDONTWRITEBYTECODE=1 "${PYTHON:-python}" \
+if [[ "${1:-}" == "--benchmark" && $# == 2 ]]; then
+    REIVRO_BENCHMARK_OUTPUT="$output" REIVRO_LOCAL_TEST_POSTGRES="$name"         PYTHONDONTWRITEBYTECODE=1 "${PYTHON:-python}" -m pytest -q tests/test_scop_effectiveness_benchmark.py -k effectiveness_benchmark
+else
+    REIVRO_LOCAL_TEST_POSTGRES="$name" PYTHONDONTWRITEBYTECODE=1 "${PYTHON:-python}" \
     -m pytest -q tests/test_scop_firewall_checks.py tests/test_scop_firewall_recovery.py
+fi
