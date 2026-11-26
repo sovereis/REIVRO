@@ -1,4 +1,4 @@
-# SCOP Workspace
+# REIVRO Workspace
 
 SCOP reviews a public GitHub pull request locally. It shows a summary with links and exact source excerpts for each claim.
 
