@@ -16,6 +16,8 @@ psql -X -W -v ON_ERROR_STOP=1 \
 
 ## JWT real e RLS legada
 
+Para Windows PowerShell 5.1 ou PowerShell 7, use os [comandos para as cinco identidades e o provisionamento controlado](WINDOWS_STAGING_JWT.md).
+
 Use Python 3 e duas fixtures sintéticas legadas, uma por projeto. Confirme com o operador os dois pares repositório/run, as associações e os UUIDs das identidades por canal privado. Execute primeiro reviewer A e reviewer B para estabelecer que os dois runs existem e são visíveis no escopo legítimo. Sem esses controles positivos, os retornos nulos dos outros sujeitos são inconclusivos.
 
 Cada operador obtém seu access token pela sessão Auth normal e usa uma execução própria, com chave publicável `sb_publishable_…` do staging. O script recebe credenciais por prompt oculto e fixa o domínio de staging. O processo do agente deve ficar isolado do terminal, perfil, arquivos e credenciais do reviewer.

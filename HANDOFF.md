@@ -288,7 +288,7 @@ Windows PowerShell 5.1 ainda não tem confirmação de execução pelo founder.
 
 ## 7. Próxima missão operacional: autenticação real com pré-condições
 
-Use o [guia de validação pós-003](ops/vercel-pilot/staging/POST_003_VALIDATION.md) e seus scripts. A auditoria de catálogo e dados já passou em modo somente leitura. Confirme inventário de fixtures e identidades por canal privado. Execute Auth e leituras legadas com JWT real em processos separados, começando pelos controles positivos de A e B. O staging ainda não tem membership agent nem submissões de tarefa. O caminho de leitura de tarefas adquire locks de linha. Para toda a matriz de tarefas, confirme freeze, frescor do backup e autorização específica para fixtures e transições. Preserve o bloqueio da Private Alpha.
+Use o [guia de validação pós-003](ops/vercel-pilot/staging/POST_003_VALIDATION.md) e o [kit Windows para os cinco JWTs e as fixtures](ops/vercel-pilot/staging/WINDOWS_STAGING_JWT.md). A última leitura administrativa encontrou cinco contas, uma sem membership, e zero submissões. A execução real dos cinco JWTs aguarda os titulares com suas sessões e os IDs privados das fixtures. A auditoria de catálogo e dados já passou em modo somente leitura. Confirme inventário de fixtures e identidades por canal privado. Execute Auth e leituras legadas com JWT real em processos separados, começando pelos controles positivos de A e B. O staging ainda não tem membership agent nem submissões de tarefa. O caminho de leitura de tarefas adquire locks de linha. Para toda a matriz de tarefas, confirme freeze, frescor do backup e autorização específica para fixtures e transições. Preserve o bloqueio da Private Alpha.
 
 ### Papéis a comprovar com JWTs reais
 
