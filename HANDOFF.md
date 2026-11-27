@@ -4,9 +4,10 @@ Checkpoint documental: **26/11/2026, America/Sao_Paulo**. Repositório correto:
 **[sovereis/REIVRO](https://github.com/sovereis/REIVRO)**. Não usar `sovereigns/REIVRO`.
 
 Este documento transfere contexto para outra conversa do Codex. Não autoriza
-migrations, escritas hospedadas, deploy, despesas ou liberação da alpha. Nesta
-consolidação foram inspecionados Git, arquivos e relatórios; não foi feita nova
-consulta ao staging nem reexecução das suítes do produto.
+migrations, escritas hospedadas, deploy, despesas ou liberação da alpha. Atualização
+posterior ao handoff d642490: 002 reconciliada e 003 aplicada pelo founder; auditoria
+independente somente leitura confirmou o estado pós-003. Ver
+[relatório pós-003 e preparação JWT](docs/STAGING_AUDIT_003_AND_JWT_PREFLIGHT.md).
 
 ## 1. Leia primeiro: situação operacional
 
@@ -15,16 +16,14 @@ consulta ao staging nem reexecução das suítes do produto.
 - O kit operacional legível está publicado em `ops/migration-003-staging`,
   **e274c8248d56b2d155df8f30d7d5dc8e74d604a6**, filho direto de e280fa4.
   Esse commit acrescenta somente o script e suas instruções.
-- Esta branch de handoff deriva de e274c82 e acrescenta somente `HANDOFF.md`.
-  O próprio SHA do handoff deve ser obtido por `git rev-parse HEAD` ou pelo remoto;
-  ele não pode ser incluído no próprio conteúdo do commit sem circularidade.
-- **001: aplicada no staging; 002: aplicada e auditada em leitura; 003: preparada,
-  corrigida, testada localmente, sem confirmação de aplicação hospedada.**
-- **Ledger 002: reconciliação preparada, sem confirmação de execução.** A última
-  inspeção disponível ainda tinha somente a entrada da 001. Não reaplicar 002.
-- **JWTs reais do control plane: NÃO VALIDADOS.** A próxima finalidade operacional
-  é essa matriz, mas primeiro é obrigatório confirmar o estado atual, reconciliar
-  o ledger e aplicar/validar 003 em etapas especificamente autorizadas.
+- O handoff original está em `docs/reivro-handoff-6-4`,
+  **d64249066dead9662fdbd96dbfb8e72fb9b0eec4**. Esta atualização e scripts de leitura
+  estão na branch `ops/control-plane-jwt-preflight`, derivada desse commit.
+- **001/002/003 aplicadas; ledger 002 reconciliado; pós-check 003 aprovado
+  independentemente em leitura. NÃO REAPLICAR MIGRATIONS nem repetir reconciliação.**
+- **JWTs reais do control plane: NÃO VALIDADOS.** A próxima etapa é validar login
+  e leituras por identidade em processos isolados, seguida da matriz mutável somente
+  com autorização específica. Nenhum membership agent ou task fixture existe hoje.
 - Writers foram reportados suspensos pelo founder. Isso é um checkpoint histórico,
   não uma garantia permanente: reconfirmar antes de qualquer nova escrita.
 - **PRIVATE ALPHA: BLOCKED. HOSTED SECURITY BOUNDARY: NOT VALIDATED.**
@@ -155,7 +154,7 @@ um pedido para reiniciar o desenvolvimento a partir delas.
 | Task Verification v1 | server/scop_task_verification.py; docs/TASK_COMPLETION_VERIFICATION.md | Arquivo obrigatório, mudança requerida, escopo, proteção, evidência e revisão | VERIFIED cobre critérios estáticos aprovados, não objetivo semântico completo |
 | Task Firewall | server/scop_task_policy.py; docs/TASK_FIREWALL.md | Reincidência, aprovação, correção e revogação locais | Não habilitar regra remota sem matriz hospedada |
 | Developer Preview | reivro; server/scop_preview.py; server/scop_preview_demo.py | CLI humana/JSON, instalação/demo locais | WSL/segunda máquina/alpha externa não validados |
-| Hosted control plane | supabase/staging/003_control_plane.sql; docs/HOSTED_CONTROL_PLANE.md | RLS/RPCs/roles, concorrência e restore em PostgreSQL descartável | 003 ainda sem aplicação hospedada confirmada; transporte remoto futuro |
+| Hosted control plane | supabase/staging/003_control_plane.sql; docs/HOSTED_CONTROL_PLANE.md | Testes PostgreSQL descartáveis e agora auditoria administrativa independente pós-003 | Aplicação/estrutura confirmadas; JWTs reais, fronteira humana e transporte remoto não validados |
 
 Documentos de entrada: `docs/DEVELOPER_PREVIEW.md`, `docs/alpha/README.md`,
 `docs/alpha/VALIDATION.md`, `docs/HOSTED_CONTROL_PLANE.md`,
@@ -219,13 +218,13 @@ Founder confirmou outras escritas suspensas, duas amostras estáveis, zero runs
 pendentes, 12 eventos, sequência `12/true` e relatórios integrais de 213 linhas,
 sem divergências. Reconfirmar freeze e frescor antes de novo passo.
 
-### Último estado conhecido; não é leitura nova deste handoff
+### Estado pós-003 auditado independentemente nesta atualização
 
 | Migration | Estado e evidência | Ação pendente |
 | --- | --- | --- |
 | 001_firewall.sql | Aplicada; ledger `20261123210041`, nome `reivro_firewall_staging` | Preservar schema, dados e decisões |
-| 002_durable_execution.sql | Founder aplicou; inspeção independente somente leitura e postcheck/data guard passaram | Reconciliar ledger sem reaplicar o SQL |
-| 003_control_plane.sql de e280fa4 | Corrigida e testada localmente; task_submissions ausente na última inspeção | Reconciliação, preflight, aplicação expressamente autorizada e pós-validação |
+| 002_durable_execution.sql | Aplicada; ledger reconciliado e hash exato auditado | Não reaplicar/reconciliar novamente |
+| 003_control_plane.sql de e280fa4 | Aplicada pelo founder; task_submissions presente e pós-check independente PASS | Preparar leituras JWT e depois escritas sintéticas autorizadas |
 
 A 003 corrigida cria `task_contracts`, `task_submissions`, `task_policies` e
 `task_corrections`; amplia o contrato de memberships para agent e expõe a RPC
@@ -247,13 +246,19 @@ Pós-002 conhecido: 2 projetos, 4 memberships, 5 usuários Auth, 5 runs/0 penden
 `execution_leases` presente/vazia, RLS ativo, ACL apenas do owner, sete colunas
 esperadas e oito constraints validadas. Dados originais preservados; comparação
 Auth antes/depois é conclusão reportada pelo operador, com hash atual registrado
-independentemente. Nenhuma confirmação posterior de aplicação da 003 foi recebida.
+independentemente. Na atualização pós-003, essas contagens e os sete digests foram
+novamente conferidos e preservados. As quatro tabelas task estão vazias. RLS ativo
+nas 11 tabelas; zero constraints não validadas. Cinco Auth users confirmados/não
+anônimos; nenhum agent e um usuário sem membership. Não foram criadas fixtures.
 
-Fingerprints MD5 de corpos de função observados após 002:
+Fingerprints atuais MD5 de corpos de função (V2 permanece apenas histórico):
 
 | Função | MD5 |
 | --- | --- |
-| reivro_cloud.dispatch(text,jsonb) V2 | 821570bb9304b8e4348996990f804aa2 |
+| reivro_cloud.dispatch(text,jsonb) V3 | 5789d2beb5926fbfe2006973dd66d337 |
+| reivro_cloud.execution_dispatch(text,jsonb,uuid) | e76a6ec5da5b3a2d9122cbd20e52f9d8 |
+| reivro_cloud.task_dispatch(text,jsonb) | 3c56d88c40c4a66f564fa4d51fca0930 |
+| reivro_checks_api.task_dispatch(text,jsonb) | 3458700a52910337fea6aca7f57d8f03 |
 | reivro_cloud.dispatch_v1(text,jsonb) | 7b65dd994ca180ed06312d3c0a7820fe |
 | reivro_checks_api.dispatch(text,jsonb) | 33ebec2c2d3ac3c64b6955369778fc61 |
 | reivro_checks_api.read_run(bigint,uuid) | 8815aa0cb0ee1f7b6c1d64315bd019d1 |
@@ -261,20 +266,31 @@ Fingerprints MD5 de corpos de função observados após 002:
 Owner/security/search_path e ACLs foram inspecionados. Não confundir MD5 de prosrc
 com SHA256 dos arquivos SQL. O kit verifica ambos nos seus respectivos contextos.
 
+### Diferença 001 documentada, sem enfraquecer segurança
+
+O ledger 001 tem SHA256 8f40e7609c9116fe63a422851730ebf0685d4e64cdfcde9b69c24577612591f1,
+enquanto o arquivo Git tem 3ff87132971c85fae078b73bcc0bbbda1822ab88cbcf27552060ddcc45ee84d3.
+A única diferença textual, reproduzida por hash, adiciona à own_membership a condição
+`(select auth.jwt()->>'is_anonymous') is distinct from 'true'`. A política hospedada
+contém essa proteção mais restritiva. Não substituir pelo arquivo antigo nem editar
+ledger para esconder a diferença. 002/003 conferem com os arquivos aprovados. Ver
+relatório pós-003 para os detalhes e a dívida de consolidação futura no código.
+
 ### Ledger e kit aprovado
 
-A aplicação manual da 002 não atualizou o ledger CLI automaticamente. O estado
-observado foi schema V2 mais somente entrada 001. Isso é divergência de histórico,
-não justificativa para executar 002 outra vez.
+A divergência histórica após a aplicação manual da 002 foi resolvida pelo founder.
+A auditoria independente confirmou exatamente três entradas, com nomes, fontes e
+chaves de idempotência 002/003 correspondentes ao kit aprovado:
 
-- Reconciliação proposta: `20261126000200`, `reivro_durable_execution_002`.
-- 003 futura: `20261126000300`, `reivro_control_plane_003`.
+- 001: `20261123210041`, `reivro_firewall_staging`.
+- 002 reconciliada: `20261126000200`, `reivro_durable_execution_002`.
+- 003 aplicada: `20261126000300`, `reivro_control_plane_003`.
 - São identificadores de bookkeeping, não horários reais de aplicação.
 - Ledger002 grava o SQL aprovado como texto inerte e chave de idempotência após
   guards; não executa o texto armazenado. Colisão de ledger deve interromper.
 - Apply003 engloba corpo aprovado, guards e ledger 003 na mesma transação.
 
-Kit publicado e fonte autoritativa das instruções operacionais:
+Kit histórico de aplicação, preservado para rastreabilidade (NÃO reaplicar):
 
 - `ops/vercel-pilot/staging/control-plane-003-local.ps1`
 - `ops/vercel-pilot/staging/CONTROL_PLANE_003_LOCAL.md`
@@ -295,35 +311,31 @@ legível publicado acima. O download raw pelo commit e274c82 foi testado e seu h
 conferido. PowerShell 7.4.6/Linux passou preparação e controles de interrupção;
 Windows PowerShell 5.1 ainda não tem confirmação de execução pelo founder.
 
-## 7. Próxima missão operacional: autenticação real com pré-condições
+## 7. Próxima missão operacional: JWTs reais após auditoria pós-003
 
 **Uma tarefa, com gates sequenciais:** fechar a operação 6.4 e produzir evidência
 sanitizada da matriz real do control plane, sem Vercel e sem novos recursos pagos.
 Não iniciar implementação de funcionalidades paralelas.
 
-1. Ler este handoff, conferir branch/commit/hash e perguntar ao founder se houve
-   execução local posterior ainda não reportada. Não presumir sucesso da 003.
-2. Reconfirmar staging, writers suspensos, backup/frescor, schema, dados, sequência
-   e ledger em modo somente leitura. Credencial SQL administrativa não valida JWT.
-3. Se ledger002 ainda faltar, seguir a reconciliação restrita após confirmação da
-   etapa pelo founder. Auditar resultado, sem executar 002 novamente.
-4. Se 003 faltar, repetir Preflight003, obter autorização operacional expressa para
-   essa etapa e usar o corpo corrigido de e280fa4. Não executar por ler este handoff.
-   Validar pós-commit e preservação dos dados antes de criar fixtures.
-5. Se resultado de commit for incerto, manter freeze, inspecionar catálogo/ledger e
-   reconciliar recibos. Nunca fazer retry automático. Se 002 ficou válida e 003
-   falhou, manter 002 e control plane de tarefas desabilitado.
-6. Confirmar identidades/associações sintéticas existentes e credenciais por canal
-   seguro. Cinco usuários anteriores não garantem os seis sujeitos agora necessários:
-   reviewer A, viewer A, worker A, agent A, reviewer de B e sem membership.
-   Provisionar agent adicional somente com autorização; não reaproveitar silenciosamente
-   o usuário sem vínculo. Guardar IDs de fixture para limpeza posterior.
-7. Obter JWTs pelo login normal, com chave publicável. Começar por GET /auth/v1/user
-   e leituras permitidas/negadas; nenhuma criação automática de usuários ou escrita
-   ao encontrar ausência de credencial. Só depois, com autorização específica para
-   as escritas sintéticas, exercitar transições completas e revogações.
-8. Registrar SHAs/digests/eventos/decisões/resultados sanitizados; nunca tokens,
-   senhas, conteúdo de auth.users, claims completos ou cabeçalhos de autenticação.
+1. Ler o relatório pós-003, conferir branch/commit/hash e preservar o estado atual.
+   002/003 e o ledger já estão confirmados; qualquer divergência nova exige investigar,
+   não replay de migration. Auditoria SQL administrativa não valida JWT.
+2. Preparar manifests privados a partir de inventário confiável, com sujeitos,
+   memberships, projetos e fixtures reais. Não usar UUID aleatório como controle
+   negativo sem fixture existente e controle positivo independente.
+3. Obter/carregar tokens de login normal em contextos isolados. O novo runner
+   `ops/vercel-pilot/staging/jwt_preflight.py` usa um único REIVRO_VALIDATION_JWT
+   por processo. Começar por Auth e leituras legadas; não expor tokens no chat.
+4. Resolver a ausência de agent e tasks somente após autorização específica para
+   provisionamento/escritas sintéticas. Não converter o usuário sem vínculo.
+   A matriz completa também precisa de outro agent para comprovar acesso negado
+   a submissões de outro dono no mesmo projeto A.
+5. Executar task-read com fixtures existentes e depois, em etapa autorizada,
+   autoaprovação negada, decisões humanas, resultados worker, leases/fencing,
+   concorrência, revogações e recuperação. Cada fase mantém seu próprio veredito.
+6. Registrar IDs privados para limpeza e evidências sanitizadas. Em falha de
+   segurança, parar operações dependentes e preservar evidência. PRIVATE ALPHA
+   continua BLOCKED, mesmo se Auth ou auditoria de catálogo passar.
 
 ### Papéis a comprovar com JWTs reais
 
@@ -379,7 +391,13 @@ ambiente. Cadastro no Cofre não prova vínculo com a tarefa. Conferir bindings 
 rede desta nova sessão sem revelar valores; não contornar proxy. Essas observações
 históricas não provam que a chave continua ausente nem habilitam seu uso administrativo.
 
-## 8. Testes e benchmarks: resultados registrados, não reexecutados agora
+## 8. Testes atuais de preparação e resultados históricos
+
+Nesta atualização: **305 passed, 28 skipped em 17,44 s** na suíte padrão, incluindo
+**40 testes novos offline** do harness JWT. Fixtures HTTP não são sessões reais.
+Auditoria SQL independente passou no staging em leitura. Browser, Docker,
+benchmarks e live GitHub não foram reexecutados. Os números abaixo são históricos.
+
 
 Último checkpoint técnico de e280fa4, conforme `docs/HOSTED_CONTROL_PLANE.md`:
 
@@ -469,7 +487,7 @@ sem JWTs, transporte e separação de credenciais comprovados.
 
 Ordem do roadmap, sem expansão periférica:
 
-1. **Fechar operação 6.4 e matriz JWT real** conforme os gates acima.
+1. **Executar matriz JWT real pós-003** conforme os gates acima, sem reaplicar migrations.
 2. **Demonstrar fronteira humana hospedada:** reviewer independente do processo do
    agente, proteção de credenciais e impossibilidade real de autoaprovação/revogação.
 3. **Implementar incremento mínimo de transporte remoto**, em missão separada:
@@ -510,7 +528,7 @@ com limites, integridade e destruição adequados.
   isolamento para fazer teste passar. Não permitir agente decidir como reviewer.
 - Sem credenciais, senhas, JWTs, backups, dados privados ou arquivos de evidência
   sensíveis em chat/Git/logs. Usar dados sintéticos e registrar IDs para limpeza.
-- Sem reaplicar 002, aplicar 003 sem a etapa autorizada ou reverter schema com
+- Sem reaplicar 001/002/003, repetir ledger repair ou reverter schema com
   DROP/destruição após novos dados. Preferir reconciliação e correção forward
   revisada; restore é operação independente com destino/versão conferidos.
 - Parar em alvo incorreto, drift, hash/ACL/RLS divergente, timeout, resultado de
@@ -521,6 +539,13 @@ com limites, integridade e destruição adequados.
   detecção como prevenção efetiva.
 
 ## 11. Trabalhos locais e recuperação de contexto
+
+Scripts novos e relatório desta atualização estão publicados em
+`ops/control-plane-jwt-preflight`: audit-003-readonly.sql,
+fixture-inventory-readonly.sql, jwt_preflight.py, Invoke-JwtPreflight.ps1 e
+`docs/STAGING_AUDIT_003_AND_JWT_PREFLIGHT.md`. Nenhum SQL de migration foi alterado.
+O inventário de arquivos locais abaixo descreve a conversa anterior, não garante
+que esses arquivos existam em outro ambiente.
 
 No Cloud desta conversa há worktrees separados para as fases históricas. Não
 apagar ou sobrescrever worktrees/branches existentes. O checkout
@@ -544,12 +569,12 @@ da referência efetivamente aprovada; nenhum merge é necessário para ler este 
 
 ## 12. Mensagem pronta para a próxima conversa
 
-> Retome sovereis/REIVRO pela branch docs/reivro-handoff-6-4 e leia HANDOFF.md.
-> Confirme seu SHA remoto antes de agir. O núcleo aprovado é e280fa4 e o kit
-> operacional é e274c82. 002 já foi aplicada e auditada; ledger002 e 003 ainda não
-> têm execução confirmada. Não reaplique 002. A finalidade é fechar a missão 6.4
-> e validar JWTs reais, após confirmar estado/freeze e autorizações de cada etapa.
-> Preserve toda a arquitetura e mantenha Private Alpha bloqueada. Não implemente
-> funcionalidades novas, não exponha credenciais, não faça deploy/merge/despesas
-> ou operação em produção. Comece relatando fatos comprovados, lacunas e a próxima
-> etapa que pode ser executada dentro da autorização atual.
+> Retome sovereis/REIVRO pela branch ops/control-plane-jwt-preflight e leia
+> HANDOFF.md e docs/STAGING_AUDIT_003_AND_JWT_PREFLIGHT.md. Confirme o SHA remoto.
+> 001/002/003 e ledger002 estão aplicados/conferidos em auditoria independente
+> somente leitura. NÃO REAPLIQUE migrations nem reconciliação. Os dados anteriores
+> estão preservados; ainda não há agent membership ou task fixtures. JWTs reais
+> não foram validados. Prepare contextos separados e comece por Auth/leituras com
+> os scripts publicados. Provisionamento, escritas sintéticas e revogações exigem
+> autorização específica. Preserve arquitetura e mantenha Private Alpha bloqueada.
+> Sem credenciais no chat/Git, produção, deploy, merge, Checks ou despesas.
