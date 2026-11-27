@@ -24,36 +24,48 @@ O staging continua no PostgreSQL 17. O `pg_dump` 19 lê a origem 17 e o `pg_rest
 
 ## Agent A após autorização específica
 
-**Pare aqui até receber autorização explícita para as duas escritas de staging:** criar uma conta Auth sintética nova para Agent A e inserir uma membership `agent` no projeto A. O escopo de escrita termina nessa membership. Contratos, submissões e demais fixtures aguardam autorização própria.
+O founder reportou `SELECTIVE_RESTORE_PASS` para
+`C:\Users\LENOVO\REIVRO-Backups\reivro-staging-20261127-183321-65f72840`,
+com auditorias Cloud e Auth aprovadas antes e depois do backup e na restauração
+PostgreSQL 19. O conteúdo privado do recibo não foi transferido. O comando abaixo
+recalcula localmente o SHA256 e confere tamanho, TOC e versões 17→19 contra o
+archive antes de iniciar o preflight de staging.
 
-Com o recibo aprovado e o freeze reconfirmado, consulte os UUIDs existentes e o repositório A pelo inventário privado. Antes de criar a conta, registre o início UTC da janela autorizada. No Dashboard do projeto `lbklqqqbmeyseeccdqog`, crie uma conta Auth dedicada e confirmada, com credencial exclusiva no cofre do Agent. Registre o UUID sem compartilhá-lo em chat. Use a janela real registrada antes da criação.
+**Pare antes de executá-lo até confirmar o freeze e autorizar estas duas escritas:**
+uma conta Auth sintética confirmada para Agent A e uma membership `agent` no
+projeto A. O script solicita a senha PostgreSQL e a secret API key do staging por
+prompts ocultos. Solicita também e-mail e senha exclusivos do Agent, identifica
+o projeto A pelo inventário e exige a frase
+`AGENT-A-AUTH-AND-MEMBERSHIP-APPROVED` imediatamente antes das escritas.
+
+Cole todo o bloco em uma aba nova do Windows PowerShell ou PowerShell 7 no Windows
+Terminal. Ele não depende de variáveis de sessões anteriores.
 
 ```powershell
-$RepoUrl = 'https://github.com/sovereis/REIVRO.git'
-$GateBranch = 'docs/reivro-handoff-6-4'
-$Checkout = Join-Path ([IO.Path]::GetTempPath()) ('reivro-agent-' + [guid]::NewGuid().ToString('N'))
-git clone --single-branch --branch $GateBranch $RepoUrl $Checkout
-if ($LASTEXITCODE -ne 0) { throw 'Clone falhou.' }
-$Ops = Join-Path $Checkout 'ops/vercel-pilot/staging'
-$PgBin = Read-Host 'Pasta bin do PostgreSQL 19'
-$Psql = Join-Path $PgBin 'psql.exe'
-$Staging = 'host=aws-1-us-west-1.pooler.supabase.com port=5432 user=postgres.lbklqqqbmeyseeccdqog dbname=postgres sslmode=verify-full'
-$AgentId = [guid](Read-Host 'UUID da nova conta Auth do Agent A')
-$RepositoryId = [long](Read-Host 'ID numerico aprovado do repositorio sintetico A')
-$AuthorizedAfter = Read-Host 'Inicio UTC da janela, registrado antes da criacao da conta'
-$Approval = Read-Host 'Com autorizacao registrada, digite STAGING-AGENT-APPROVED'
-if ($Approval -cne 'STAGING-AGENT-APPROVED') { throw 'Escrita cancelada.' }
+& {
+    $Checkout = Join-Path ([IO.Path]::GetTempPath()) ('reivro-agent-a-' + [guid]::NewGuid().ToString('N'))
+    git clone --no-checkout https://github.com/sovereis/REIVRO.git $Checkout
+    if ($LASTEXITCODE -ne 0) { throw 'Clone falhou.' }
 
-& $Psql -X -W -d $Staging -v ON_ERROR_STOP=1 `
-    -v "agent_id=$AgentId" -v "repository_id=$RepositoryId" `
-    -v "authorized_after=$AuthorizedAfter" -v "approval=$Approval" `
-    -f (Join-Path $Ops 'provision_staging_agent.sql')
-if ($LASTEXITCODE -ne 0) { throw 'Resultado incerto ou divergente. Inspecione antes de repetir.' }
+    git -C $Checkout checkout --detach 097424290189371ed42da75b105c04af44d56bcc
+    if ($LASTEXITCODE -ne 0) { throw 'Kit aprovado indisponivel.' }
 
-& $Psql -X -W -d $Staging -v ON_ERROR_STOP=1 `
-    -v "agent_id=$AgentId" -v "repository_id=$RepositoryId" `
-    -f (Join-Path $Ops 'inspect_staging_agent.sql')
-if ($LASTEXITCODE -ne 0) { throw 'Pos-check pendente. Interrompa.' }
+    $Ops = Join-Path $Checkout 'ops/vercel-pilot/staging'
+    & (Join-Path $Ops 'Reconcile-ReivroReceipt.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Receipt privado nao reconciliado.' }
+
+    & (Join-Path $Ops 'Provision-ReivroAgentA.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Provisionamento incompleto. Leia o recibo privado antes de qualquer nova acao.' }
+}
 ```
 
-Espere `AGENT_MEMBERSHIP_COMMIT_ACKNOWLEDGED` e `AGENT_A_INVENTORY_PASS`. A criação no Auth e a inclusão no PostgreSQL são etapas separadas. Em falha parcial, preserve o UUID da conta nova e reconcilie seu estado antes de qualquer nova ação. Após o pós-check, aguarde escopo autorizado para a fixture. [Matriz e ordem operacional](CONTROL_PLANE_OPERATIONAL_GATE.md)
+A saída esperada termina em `AGENT_A_PROVISIONED` e aponta para
+`agent-a-provisioning-receipt.json` dentro da pasta privada do backup. Em falha
+após a criação Auth, preserve o UUID e o recibo `AUTH_CREATED_MEMBERSHIP_PENDING`.
+Não repita a criação. Reconcilie o mesmo usuário antes de qualquer ação.
+
+O gate preserva os cinco UUIDs e quatro memberships anteriores. Ele falha se
+existirem contratos, submissões, policies, corrections, leases, runs pendentes
+ou mudança no journal. Não cria contratos nem submissões. Depois do PASS, faça
+login normal do Agent em seu contexto isolado e aguarde nova autorização para
+fixtures. [Matriz e ordem operacional](CONTROL_PLANE_OPERATIONAL_GATE.md)
