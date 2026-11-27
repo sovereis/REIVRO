@@ -4,7 +4,7 @@
 
 ## Backup e ensaio de restauração
 
-Abra uma aba **Windows PowerShell** ou **PowerShell 7** no Windows Terminal. Use os binários PostgreSQL 19 já instalados e a pasta existente `REIVRO-Backups`, em volume criptografado, com ACL restrita e fora do checkout. O libpq precisa confiar na CA do Session Pooler para SSL verify-full. O script pede as senhas pelo prompt do PostgreSQL. As primeiras conexões usam a senha do staging. Após o aviso de inicialização, os prompts usam a senha temporária do PostgreSQL local.
+Abra uma aba **Windows PowerShell** ou **PowerShell 7** no Windows Terminal. Use os binários PostgreSQL 19 já instalados e a pasta existente `REIVRO-Backups`, em volume criptografado, com ACL restrita e fora do checkout. O script usa o certificado existente em `$HOME\Downloads\prod-ca-2021.crt` com `sslmode=verify-full`. Ele solicita a senha do banco de staging uma vez por prompt oculto e a fornece somente aos processos PostgreSQL que acessam essa origem. A conexão local usa uma senha temporária separada, também por prompt oculto. O arquivo temporário de inicialização fica na pasta criptografada e é apagado logo após `initdb`. O ambiente temporário de cada comando é limpo inclusive em falha. Preserve as ACLs restritas da pasta.
 
 ```powershell
 $RepoUrl = 'https://github.com/sovereis/REIVRO.git'
