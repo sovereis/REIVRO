@@ -2,6 +2,25 @@
 
 **Private Alpha bloqueada.** Único destino: staging `lbklqqqbmeyseeccdqog`. Use o checkout da revisão publicada, a partir da raiz do repositório. O PowerShell recebe uma chave publicável e um access token por execução, ambos em prompts ocultos. Use a sessão Supabase Auth normal de cada pessoa de teste e um access token ainda válido. Uma nova autenticação pode atualizar registros de sessão e timestamps do Auth. O script usa a sessão existente por meio do seu token e chama somente `GET /auth/v1/user` e a RPC legada estável na primeira fase.
 
+## Login automático por e-mail e senha
+
+Use esta opção para obter o JWT pelo Auth e testar RLS na mesma execução. A chave publicável `default` do staging foi aceita por Auth, o provedor e-mail está habilitado e a RPC legada negou chamada sem usuário. As cinco identidades têm e-mail confirmado e senha cadastrada. No painel de staging, abra **Authentication → Users** e use cada UUID do inventário privado para conferir o e-mail correspondente. Preserve a correspondência entre papel, UUID e titular.
+
+Prepare o bloco de dados comuns da seção seguinte em cada terminal independente. Em **Settings → API Keys**, selecione a chave publicável moderna `default` (`sb_publishable_…`) do projeto `lbklqqqbmeyseeccdqog`. O script verifica a chave antes de solicitar e-mail e senha, todos por prompt oculto. Cada login pode atualizar o estado da sessão no Supabase Auth. O teste da aplicação usa somente `read_run`.
+
+```powershell
+$LoginScript = Join-Path $PWD 'ops/vercel-pilot/staging/Test-ReivroStagingLogin.ps1'
+& $LoginScript @Legacy -Subject reviewer-a -UserId ([guid](Read-Host 'UUID reviewer A'))
+& $LoginScript @Legacy -Subject reviewer-b -UserId ([guid](Read-Host 'UUID reviewer B'))
+& $LoginScript @Legacy -Subject viewer-a -UserId ([guid](Read-Host 'UUID viewer A'))
+& $LoginScript @Legacy -Subject worker-a -UserId ([guid](Read-Host 'UUID worker A'))
+& $LoginScript @Legacy -Subject sem-vinculo -UserId ([guid](Read-Host 'UUID sujeito sem vinculo'))
+```
+
+Execute cada linha no contexto do próprio titular, começando pelos dois reviewers. Continue após os dois controles positivos. O access token é usado em memória para verificar o UUID pelo Auth e fazer as leituras. O script mantém senhas, tokens e corpos de resposta fora da saída. Registre apenas papel, etapa, resultado e status HTTP.
+
+`FAIL … api-key HTTP 401` indica que a API de staging recusou a chave apresentada. Confira a origem da chave no painel. Com `PASS … api-key`, um `FAIL … login` indica falha na etapa de autenticação ou divergência do UUID esperado. Pare diante de um resultado inesperado e preserve o resultado sanitizado.
+
 ## Cinco identidades existentes
 
 Consulte o inventário privado para os UUIDs e confirme que os runs são fixtures de sintaxe, uma por projeto. Os dois reviewers devem completar seus controles positivos antes de interpretar resultados nulos. Execute o bloco de dados comuns em cada terminal independente. A pessoa sem vínculo usa sua própria sessão. O contexto do reviewer permanece inacessível ao processo do agent.
