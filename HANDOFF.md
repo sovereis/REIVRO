@@ -1,10 +1,10 @@
 # REIVRO — handoff de engenharia e operação
 
-Checkpoint documental: **26/11/2026, America/Sao_Paulo**. Repositório correto:
+Checkpoint documental: **27/11/2026, America/Sao_Paulo**. Repositório correto:
 **[sovereis/REIVRO](https://github.com/sovereis/REIVRO)**. Não usar `sovereigns/REIVRO`.
 
 Este documento transfere contexto para outra conversa do Codex. Não autoriza
-migrations, escritas hospedadas, deploy, despesas ou liberação da alpha. A revisão pós-003 inspecionou Git e staging em transação somente leitura. As suítes do produto e a matriz JWT real permanecem sem nova execução.
+migrations, escritas hospedadas, deploy, despesas ou liberação da alpha. A revisão pós-003 inspecionou Git e staging em transação somente leitura. O founder reportou a execução dos cinco JWTs para Auth e RLS legada. A matriz de tarefas e as suítes do produto permanecem sem nova execução.
 
 ## 1. Leia primeiro: situação operacional
 
@@ -17,7 +17,7 @@ migrations, escritas hospedadas, deploy, despesas ou liberação da alpha. A rev
   O próprio SHA do handoff deve ser obtido por `git rev-parse HEAD` ou pelo remoto;
   ele não pode ser incluído no próprio conteúdo do commit sem circularidade.
 - **001, 002 e 003 aplicadas no staging e registradas no ledger.** A auditoria independente somente leitura confirmou o estado pós-003. Não reaplicar migrations.
-- **JWTs reais do control plane pendentes.** A validação começa pela Auth e pela matriz RLS legada com identidades reais. A fase de tarefas requer fixtures e autorização específica.
+- **Cinco JWTs reais aprovados para Auth e RLS legada, conforme relato do founder no Windows.** A auditoria independente conferiu o inventário e a preservação dos vínculos. A matriz de tarefas do Control Plane ainda requer Agent, fixtures e autorização específica.
 - Writers foram reportados suspensos pelo founder. Isso é um checkpoint histórico,
   não uma garantia permanente: reconfirmar antes de qualquer nova escrita.
 - **PRIVATE ALPHA: BLOCKED. HOSTED SECURITY BOUNDARY: NOT VALIDATED.**
@@ -140,7 +140,7 @@ um pedido para reiniciar o desenvolvimento a partir delas.
 | VERIFY sintático | server/scop_verify.py; server/scop_verify_syntax.py | BASE/HEAD, fonte/blob e compilação isolada em testes locais | Não comprova semântica funcional geral |
 | Secure Runner sintático | server/scop_firewall_sandbox.py; server/scop_verify_syntax.py | Subprocesso/limites/libseccomp no caminho sintático | Não habilita execução arbitrária |
 | Memória/Firewall local | server/scop_firewall.py; server/scop_firewall_memory.py | Journal, revisão, aprovação, artefato, revogação e ciclo local | Autoridade local depende da separação real de contas |
-| Cloud Memory/Checks worker | server/scop_firewall_checks.py; supabase/staging/001_firewall.sql | SQL/worker locais e inspeção administrativa do staging | API com JWTs dos papéis não validada |
+| Cloud Memory/Checks worker | server/scop_firewall_checks.py; supabase/staging/001_firewall.sql | SQL/worker locais e inspeção administrativa do staging | Leitura legada com cinco JWTs aprovada conforme relato do founder |
 | Durable Execution | supabase/staging/002_durable_execution.sql; testes de recovery | Testes PostgreSQL locais; 002 aplicada/auditada no staging | Recuperação via fila hospedada não validada |
 | Vercel ASGI/Queues/Sandbox | server/scop_firewall_vercel.py; ops/vercel-pilot/app.py; worker.py; vercel.json | Adaptadores e testes locais, configuração preparada | Sem ensaio hospedado; plano/custos/disponibilidade não confirmados |
 | Agent Integration/Feedback | server/scop_agent_integration.py; server/scop_agent_feedback.py; ops/agent-integration/ | Contratos, CLI, feedback sanitizado, retry/correção limitada | Ciclo completo com cliente real e operador separado pendente |
@@ -148,7 +148,7 @@ um pedido para reiniciar o desenvolvimento a partir delas.
 | Task Verification v1 | server/scop_task_verification.py; docs/TASK_COMPLETION_VERIFICATION.md | Arquivo obrigatório, mudança requerida, escopo, proteção, evidência e revisão | VERIFIED cobre critérios estáticos aprovados, não objetivo semântico completo |
 | Task Firewall | server/scop_task_policy.py; docs/TASK_FIREWALL.md | Reincidência, aprovação, correção e revogação locais | Não habilitar regra remota sem matriz hospedada |
 | Developer Preview | reivro; server/scop_preview.py; server/scop_preview_demo.py | CLI humana/JSON, instalação/demo locais | WSL/segunda máquina/alpha externa não validados |
-| Hosted control plane | supabase/staging/003_control_plane.sql; docs/HOSTED_CONTROL_PLANE.md | RLS/RPCs/roles, concorrência e restore em PostgreSQL descartável | 003 confirmada no staging; matriz JWT e transporte remoto pendentes |
+| Hosted control plane | supabase/staging/003_control_plane.sql; docs/HOSTED_CONTROL_PLANE.md | RLS/RPCs/roles, concorrência e restore em PostgreSQL descartável | 003 confirmada no staging; matriz JWT de tarefas e transporte remoto pendentes |
 
 Documentos de entrada: `docs/DEVELOPER_PREVIEW.md`, `docs/alpha/README.md`,
 `docs/alpha/VALIDATION.md`, `docs/HOSTED_CONTROL_PLANE.md`,
@@ -218,7 +218,7 @@ sem divergências. Reconfirmar freeze e frescor antes de novo passo.
 | --- | --- | --- |
 | 001_firewall.sql | Aplicada; ledger `20261123210041`, nome `reivro_firewall_staging` | Preservar schema, dados e decisões |
 | 002_durable_execution.sql | Founder aplicou; inspeção independente somente leitura e postcheck/data guard passaram | Ledger 002 reconciliado e conferido |
-| 003_control_plane.sql de e280fa4 | Aplicada pelo founder, Postcheck003 aprovado conforme seu relato e linha de base confirmada independentemente | Validar JWTs reais |
+| 003_control_plane.sql de e280fa4 | Aplicada pelo founder, Postcheck003 aprovado conforme seu relato e linha de base confirmada independentemente | Validar JWTs reais da RPC de tarefas |
 
 A 003 corrigida cria `task_contracts`, `task_submissions`, `task_policies` e
 `task_corrections`; amplia o contrato de memberships para agent e expõe a RPC
@@ -288,7 +288,7 @@ Windows PowerShell 5.1 ainda não tem confirmação de execução pelo founder.
 
 ## 7. Próxima missão operacional: autenticação real com pré-condições
 
-Use o [guia de validação pós-003](ops/vercel-pilot/staging/POST_003_VALIDATION.md) e o [kit Windows para os cinco JWTs e as fixtures](ops/vercel-pilot/staging/WINDOWS_STAGING_JWT.md). A última leitura administrativa encontrou cinco contas, uma sem membership, e zero submissões. Auth de staging aceitou a chave publicável default e tem o provedor e-mail habilitado. O kit Windows agora realiza login por e-mail/senha e testa a RLS legada no contexto de cada titular. A validação com as cinco contas aguarda execução pelos titulares. A auditoria de catálogo e dados já passou em modo somente leitura. Confirme inventário de fixtures e identidades por canal privado. Execute Auth e leituras legadas com JWT real em processos separados, começando pelos controles positivos de A e B. O staging ainda não tem membership agent nem submissões de tarefa. O caminho de leitura de tarefas adquire locks de linha. Para toda a matriz de tarefas, confirme freeze, frescor do backup e autorização específica para fixtures e transições. Preserve o bloqueio da Private Alpha.
+O founder reportou login, Auth e leituras legadas aprovados para reviewer A/B, viewer A, worker A e a conta sem vínculo no Windows. As cinco senhas foram redefinidas de acordo com o founder. A auditoria administrativa de 27/11/2026 confirmou os cinco UUIDs com os mesmos papéis, quatro memberships preservadas e zero submissões. O checkpoint sanitizado e os gates para a matriz de tarefas estão no [plano operacional do Control Plane](ops/vercel-pilot/staging/CONTROL_PLANE_OPERATIONAL_GATE.md). As etapas de provisionamento e de escrita exigem nova autorização específica.
 
 ### Papéis a comprovar com JWTs reais
 
@@ -434,7 +434,7 @@ sem JWTs, transporte e separação de credenciais comprovados.
 
 Ordem do roadmap, sem expansão periférica:
 
-1. **Executar a matriz JWT real pós-003** conforme os gates acima.
+1. **Provisionar o Agent e executar a matriz de tarefas com JWTs reais** conforme os gates acima.
 2. **Demonstrar fronteira humana hospedada:** reviewer independente do processo do
    agente, proteção de credenciais e impossibilidade real de autoaprovação/revogação.
 3. **Implementar incremento mínimo de transporte remoto**, em missão separada:
@@ -512,4 +512,5 @@ da referência efetivamente aprovada; nenhum merge é necessário para ler este 
 > Retome pela branch docs/reivro-handoff-6-4. Ledger 001–003, dispatcher V3 e
 > alias V1 confirmados por auditoria em staging somente leitura. Preserve a
 > arquitetura, mantenha Private Alpha bloqueada e use o guia pós-003 para
-> validar JWTs com identidades separadas. A matriz hospedada permanece pendente.
+> preparar a matriz de tarefas com identidades separadas. Auth e RLS legada foram
+> aprovados conforme relato do founder. A fronteira de tarefas permanece pendente.

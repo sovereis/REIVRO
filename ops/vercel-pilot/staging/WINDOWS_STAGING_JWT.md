@@ -41,6 +41,8 @@ Sem `-Apply`, há apenas leitura. Repita para os cinco papéis, um por vez. Se h
 
 ## Cinco identidades existentes
 
+O founder reportou aprovação das cinco identidades em 27/11/2026. Use esta seção para reexecuções. Consulte o [checkpoint e os gates de tarefas](CONTROL_PLANE_OPERATIONAL_GATE.md).
+
 Consulte o inventário privado para os UUIDs e confirme que os runs são fixtures de sintaxe, uma por projeto. Os dois reviewers devem completar seus controles positivos antes de interpretar resultados nulos. Execute o bloco de dados comuns em cada terminal independente. A pessoa sem vínculo usa sua própria sessão. O contexto do reviewer permanece inacessível ao processo do agent.
 
 ```powershell
@@ -75,7 +77,7 @@ Defina o cliente PostgreSQL local. O certificado do Session Pooler deve ser veri
 $Psql = (Get-Command psql.exe -ErrorAction Stop).Source
 $Staging = 'host=aws-1-us-west-1.pooler.supabase.com port=5432 user=postgres.lbklqqqbmeyseeccdqog dbname=postgres sslmode=verify-full'
 $Ops = Join-Path $PWD 'ops/vercel-pilot/staging'
-& $Psql -X -W --dbname=$Staging -v ON_ERROR_STOP=1 -f (Join-Path $Ops 'audit_post_003_read_only.sql')
+& $Psql -X -W --dbname=$Staging -v ON_ERROR_STOP=1 -f (Join-Path $Ops 'audit_post_jwt_read_only.sql')
 if ($LASTEXITCODE -ne 0) { throw 'Baseline divergiu. Interrompa.' }
 ```
 

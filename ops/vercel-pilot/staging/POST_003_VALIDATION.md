@@ -1,17 +1,17 @@
 # Validação de staging após a 003
 
-**Private Alpha bloqueada. Fronteira hospedada com JWTs reais ainda pendente.**
+**Private Alpha bloqueada. Auth e RLS legada com cinco JWTs reais aprovados conforme relato do founder. A fronteira de tarefas ainda está pendente.**
 
 ## Auditoria administrativa
 
 A leitura independente pelo Supabase, no projeto `lbklqqqbmeyseeccdqog`, passou em transação somente leitura. Confirmou os sete fingerprints de funções do kit, owners, SECURITY DEFINER e search_path, ACLs e RLS no escopo do guard, índices/FK de identidade de execução, ausência de leases e tarefas, integridade dos registros 001–003 e igualdade dos sete hashes da linha de base anterior à 003. A sequência permaneceu em 12/true. A contagem de memberships foi de dois reviewers, um viewer e um worker, sem agent. A execução do Postcheck003 pelo founder é um registro separado. Freeze operacional, frescor da cópia de recuperação e exposição efetiva pelo gateway dependem de confirmação própria.
 
-Para repetir, use apenas o Session Pooler de staging descrito no HANDOFF, com certificado confiável e SSL verify-full. O SQL contém a linha de base congelada pós-003 e deve falhar se dados ou ledger mudarem. Ele retorna apenas status e contagens, sem registros Auth. O projeto é garantido pelo destino selecionado pelo operador, portanto confira host e usuário antes da conexão.
+Para reproduzir o checkpoint atual, use o Session Pooler de staging descrito no HANDOFF com SSL verify-full. O SQL abaixo confere o inventário sanitizado pós-redefinição e a linha de base das tabelas de aplicação. Execute antes de provisionar Agent ou fixtures. [Checkpoint e ordem operacional](CONTROL_PLANE_OPERATIONAL_GATE.md)
 
 ```bash
 psql -X -W -v ON_ERROR_STOP=1 \
   "host=aws-1-us-west-1.pooler.supabase.com port=5432 user=postgres.lbklqqqbmeyseeccdqog dbname=postgres sslmode=verify-full" \
-  -f ops/vercel-pilot/staging/audit_post_003_read_only.sql
+  -f ops/vercel-pilot/staging/audit_post_jwt_read_only.sql
 ```
 
 ## JWT real e RLS legada

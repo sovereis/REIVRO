@@ -95,12 +95,12 @@ BEGIN
  AND encode(sha256(convert_to(m.statements[1],'UTF8')),'hex')=e.sha))
  THEN RAISE EXCEPTION 'Unexpected migration ledger'; END IF;
 END $$;
-DO $
+DO $$
 BEGIN
  IF current_setting('transaction_read_only') <> 'on' THEN
   RAISE EXCEPTION 'Read-only transaction required';
  END IF;
-END $;
+END $$;
 SELECT 'post_003_baseline_pass' AS status,
  current_setting('transaction_read_only') AS read_only,
  (SELECT md5(prosrc) FROM pg_proc WHERE oid=to_regprocedure('reivro_cloud.dispatch(text,jsonb)')) AS dispatcher,
