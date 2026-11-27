@@ -21,6 +21,24 @@ Execute cada linha no contexto do próprio titular, começando pelos dois review
 
 `FAIL … api-key HTTP 401` indica que a API de staging recusou a chave apresentada. Confira a origem da chave no painel. Com `PASS … api-key`, um `FAIL … login` indica falha na etapa de autenticação ou divergência do UUID esperado. Pare diante de um resultado inesperado e preserve o resultado sanitizado.
 
+
+## Redefinir senha de uma conta existente
+
+Use este fluxo somente com autorização para staging. O script fixa o host `lbklqqqbmeyseeccdqog`, confere o par papel/UUID contra o inventário das cinco contas e chama o Supabase Auth Admin pelo UUID existente. O único campo enviado no update é `password`. Em seguida, confira o papel com o kit de login real. A credencial administrativa serve exclusivamente para a redefinição. Mantenha-a fora do terminal de validação de JWT e dos contextos do agent e worker.
+
+Em um terminal administrativo Windows confiável, use a chave secreta existente do staging, por prompt oculto. Para cada conta, gere uma senha nova no gerenciador de senhas, usando pelo menos 24 caracteres aleatórios seguidos de `-<papel>`, com até 72 bytes no total. Por exemplo, o sufixo literal do primeiro papel é `-reviewer-a`. Salve a senha no cofre privado apropriado antes de executar e repita por prompt oculto. Mantenha os cofres e sessões dos reviewers fora do alcance do agente.
+
+```powershell
+$ResetScript = Join-Path $PWD 'ops/vercel-pilot/staging/Reset-ReivroStagingPassword.ps1'
+$Subject = Read-Host 'Papel: reviewer-a, reviewer-b, viewer-a, worker-a ou sem-vinculo'
+$UserId = [guid](Read-Host 'UUID do papel no inventario privado de staging')
+& $ResetScript -Subject $Subject -UserId $UserId
+# Apos PASS no preflight e com autorizacao de escrita ja registrada:
+& $ResetScript -Subject $Subject -UserId $UserId -Apply
+```
+
+Sem `-Apply`, há apenas leitura. Repita para os cinco papéis, um por vez. Se houver falha após o início do reset, teste a senha pretendida com o kit de login antes de considerar nova tentativa. Ao final, compare os mesmos cinco UUIDs e quatro vínculos com a consulta de inventário e execute os controles positivos de reviewer A/B antes dos demais papéis. O hash da tabela `auth.users` da linha de base histórica muda após redefinir senhas. Preserve o recibo anterior e registre a nova linha de base autorizada. Sessões e tokens existentes seguem as regras de expiração e revogação do Supabase Auth. [Supabase Auth Admin](https://supabase.com/docs/reference/javascript/auth-admin-updateuserbyid)
+
 ## Cinco identidades existentes
 
 Consulte o inventário privado para os UUIDs e confirme que os runs são fixtures de sintaxe, uma por projeto. Os dois reviewers devem completar seus controles positivos antes de interpretar resultados nulos. Execute o bloco de dados comuns em cada terminal independente. A pessoa sem vínculo usa sua própria sessão. O contexto do reviewer permanece inacessível ao processo do agent.
