@@ -3,7 +3,7 @@
 param(
     [Parameter(Mandatory)][string]$PrivateDirectory,
     [string]$PgBin,
-    [ValidateRange(1024,65535)][int]$LocalPort=55464
+    [ValidateRange(1024,65535)][int]$LocalPort=55465
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
@@ -11,13 +11,15 @@ $staging='host=aws-1-us-west-1.pooler.supabase.com port=5432 user=postgres.lbklq
 $loopback="host=127.0.0.1 port=$LocalPort user=postgres dbname=postgres sslmode=disable"
 $audit=Join-Path $PSScriptRoot 'audit_post_jwt_read_only.sql'
 if (-not (Test-Path -LiteralPath $PrivateDirectory -PathType Container)) { throw 'Private backup directory must exist.' }
+$PrivateDirectory=(Resolve-Path -LiteralPath $PrivateDirectory).Path
+if ((Split-Path $PrivateDirectory -Leaf) -ne 'REIVRO-Backups') { throw 'Select the existing encrypted REIVRO-Backups folder.' }
 foreach ($name in 'psql','pg_dump','pg_restore','initdb','pg_ctl') {
     $command = if ($PgBin) { Join-Path $PgBin "$name.exe" } else { "$name.exe" }
     Set-Variable -Name $name -Value (Get-Command $command -CommandType Application).Source
 }
 foreach ($tool in $psql,$pg_dump,$pg_restore,$initdb,$pg_ctl) {
     $version=& $tool --version
-    if ($LASTEXITCODE -ne 0 -or $version -notmatch '\s17\.\d+') { throw 'Use PostgreSQL 17 client and server binaries.' }
+    if ($LASTEXITCODE -ne 0 -or $version -notmatch '\s19\.\d+(?:\s|$)') { throw 'Use PostgreSQL 19 client and server binaries.' }
 }
 
 function Invoke-Pg([string]$Exe, [string[]]$Arguments) {
@@ -57,9 +59,11 @@ try {
     Write-Host 'Before continuing, confirm the directory is private and encrypted, and all staging writers are paused.'
     if ((Read-Host 'Type FREEZE to confirm') -cne 'FREEZE') { throw 'Freeze not confirmed by operator.' }
     Invoke-Pg $psql @('-X','-W','-v','ON_ERROR_STOP=1','-d',$staging,'-c',$probe,'-f',$audit)
+    $sourceVersion=Invoke-Pg $psql @('-X','-W','-qAt','-v','ON_ERROR_STOP=1','-d',$staging,'-c','SHOW server_version_num')
+    if ($sourceVersion -notmatch '^17\d{4}$') { throw 'Expected a PostgreSQL 17 staging source.' }
     $before=@(Invoke-Pg $psql @('-X','-W','-qAt','-v','ON_ERROR_STOP=1','-d',$staging,'-c',$inventory))
     if ($before.Count -lt 2 -or $before[0] -cnotmatch '^[0-9a-f]{64}$') { throw 'Unexpected source inventory.' }
-    $dumpArgs=@('-W','--format=custom','--strict-names','--lock-wait-timeout=5s','--no-publications','--no-subscriptions',
+    $dumpArgs=@('-W','--format=custom','--quote-all-identifiers','--strict-names','--lock-wait-timeout=5s','--no-publications','--no-subscriptions',
         '--schema=auth','--schema=reivro_cloud','--schema=reivro_checks_api','--schema=supabase_migrations',
         "--file=$dump","--dbname=$staging")
     foreach ($table in ($before | Select-Object -Skip 1)) {
@@ -78,9 +82,15 @@ try {
     if (Compare-Object $before $after -SyncWindow 0) { throw 'Source inventory changed during backup.' }
 
     Write-Host 'Choose a temporary local PostgreSQL password for the restore rehearsal. The next prompts use that local password.'
-    Invoke-Pg $initdb @('-D',$data,'-U','postgres','-A','scram-sha-256','-W')
+    Invoke-Pg $initdb @('-D',$data,'-U','postgres','-A','scram-sha-256','--encoding=UTF8','--locale=C','-W')
     Invoke-Pg $pg_ctl @('-D',$data,'-l',(Join-Path $root 'restore-local.log'),'-o',"-h 127.0.0.1 -p $LocalPort",'-w','start')
     $started=$true
+    $localIdentity=@(Invoke-Pg $psql @('-X','-W','-qAt','-v','ON_ERROR_STOP=1','-d',$loopback,
+        '-c','SHOW server_version_num','-c','SHOW data_directory'))
+    if ($localIdentity.Count -ne 2 -or $localIdentity[0] -notmatch '^19\d{4}$' -or
+        [IO.Path]::GetFullPath($localIdentity[1]) -ne [IO.Path]::GetFullPath($data)) {
+        throw 'Expected the new PostgreSQL 19 rehearsal cluster.'
+    }
     $roles='CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE authenticator; CREATE ROLE service_role; CREATE ROLE dashboard_user; CREATE ROLE supabase_admin; CREATE ROLE supabase_auth_admin;'
     Invoke-Pg $psql @('-X','-W','-v','ON_ERROR_STOP=1','-d',$loopback,'-c',$roles)
     Invoke-Pg $pg_restore @('-W','--exit-on-error','--single-transaction','--no-owner',"-d",$loopback,$dump)
@@ -90,6 +100,8 @@ try {
     $hash=(Get-FileHash -LiteralPath $dump -Algorithm SHA256).Hash.ToLowerInvariant()
     [pscustomobject]@{
         status='SELECTIVE_RESTORE_PASS'
+        source_server_version_num=$sourceVersion
+        restore_server_version_num=$localIdentity[0]
         captured_utc=[DateTime]::UtcNow.ToString('o')
         archive_sha256=$hash
         archive_bytes=(Get-Item -LiteralPath $dump).Length

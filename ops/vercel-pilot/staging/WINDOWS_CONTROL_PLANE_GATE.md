@@ -4,7 +4,7 @@
 
 ## Backup e ensaio de restauração
 
-Abra uma aba **Windows PowerShell** ou **PowerShell 7** no Windows Terminal. Use cliente e servidor PostgreSQL 17 instalados localmente e uma pasta privada em volume criptografado, com ACL restrita e fora do checkout. O libpq precisa confiar na CA do Session Pooler para SSL verify-full. O script pede as senhas pelo prompt do PostgreSQL. As primeiras conexões usam a senha do staging. Após o aviso de inicialização, os prompts usam a senha temporária do PostgreSQL local.
+Abra uma aba **Windows PowerShell** ou **PowerShell 7** no Windows Terminal. Use os binários PostgreSQL 19 já instalados e a pasta existente `REIVRO-Backups`, em volume criptografado, com ACL restrita e fora do checkout. O libpq precisa confiar na CA do Session Pooler para SSL verify-full. O script pede as senhas pelo prompt do PostgreSQL. As primeiras conexões usam a senha do staging. Após o aviso de inicialização, os prompts usam a senha temporária do PostgreSQL local.
 
 ```powershell
 $RepoUrl = 'https://github.com/sovereis/REIVRO.git'
@@ -13,12 +13,14 @@ $Checkout = Join-Path ([IO.Path]::GetTempPath()) ('reivro-gate-' + [guid]::NewGu
 git clone --single-branch --branch $GateBranch $RepoUrl $Checkout
 if ($LASTEXITCODE -ne 0) { throw 'Clone falhou.' }
 $Ops = Join-Path $Checkout 'ops/vercel-pilot/staging'
-$PgBin = Read-Host 'Pasta bin do PostgreSQL 17 (exemplo C:\Program Files\PostgreSQL\17\bin)'
-$PrivateDirectory = Read-Host 'Pasta privada e criptografada existente para o backup'
+$PgBin = Read-Host 'Pasta bin do PostgreSQL 19 (exemplo C:\Program Files\PostgreSQL\19\bin)'
+$PrivateDirectory = Read-Host 'Caminho completo da pasta privada existente REIVRO-Backups'
 & (Join-Path $Ops 'Backup-ReivroStaging.ps1') -PgBin $PgBin -PrivateDirectory $PrivateDirectory
 ```
 
-O ensaio usa um cluster novo em 127.0.0.1:55464. Se a porta estiver em uso, passe `-LocalPort` com outra porta local livre. Só avance após `SELECTIVE_RESTORE_PASS`, com o `receipt.json` e o arquivo preservados na pasta privada. O backup cobre schemas REIVRO, ledger e `auth.users`, excluindo dados de sessões, tokens e demais tabelas Auth. A restauração seletiva confere a linha de base pós-JWT e compara todas as linhas de `auth.users` sem expor detalhes. Ela preserva ACLs aplicáveis e usa papéis locais substitutos para o ensaio. Recuperação integral do Supabase, sessões Auth e login no cluster restaurado estão fora do ensaio. O arquivo contém dados sensíveis de Auth e deve permanecer privado.
+O ensaio usa um cluster novo em 127.0.0.1:55465. Se a porta estiver em uso, passe `-LocalPort` com outra porta local livre. Só avance após `SELECTIVE_RESTORE_PASS`, com o `receipt.json` e o arquivo preservados na pasta privada. O backup cobre schemas REIVRO, ledger e `auth.users`, excluindo dados de sessões, tokens e demais tabelas Auth. A restauração seletiva confere a linha de base pós-JWT e compara todas as linhas de `auth.users` sem expor detalhes. Ela preserva ACLs aplicáveis e usa papéis locais substitutos para o ensaio. Recuperação integral do Supabase, sessões Auth e login no cluster restaurado estão fora do ensaio. O arquivo contém dados sensíveis de Auth e deve permanecer privado.
+
+O staging continua no PostgreSQL 17. O `pg_dump` 19 lê a origem 17 e o `pg_restore` 19 carrega o arquivo em um cluster novo 19, inicializado em UTF-8. O script confere a versão do servidor em ambos os lados e o diretório de dados do cluster de ensaio antes da primeira escrita local. O dump entre versões usa identificadores entre aspas e o PostgreSQL 19 exige `standard_conforming_strings=on`. Os hashes canônicos, o ledger, a sequência e as verificações de catálogo precisam passar no destino. O sucesso certifica a restauração seletiva 17→19. Uma restauração reversa para 17 exigiria evidência e ferramenta próprias. [pg_dump 19](https://www.postgresql.org/docs/19/app-pgdump.html) · [Notas da versão 19](https://www.postgresql.org/docs/19/release-19.html)
 
 ## Agent A após autorização específica
 
@@ -33,7 +35,7 @@ $Checkout = Join-Path ([IO.Path]::GetTempPath()) ('reivro-agent-' + [guid]::NewG
 git clone --single-branch --branch $GateBranch $RepoUrl $Checkout
 if ($LASTEXITCODE -ne 0) { throw 'Clone falhou.' }
 $Ops = Join-Path $Checkout 'ops/vercel-pilot/staging'
-$PgBin = Read-Host 'Pasta bin do PostgreSQL 17'
+$PgBin = Read-Host 'Pasta bin do PostgreSQL 19'
 $Psql = Join-Path $PgBin 'psql.exe'
 $Staging = 'host=aws-1-us-west-1.pooler.supabase.com port=5432 user=postgres.lbklqqqbmeyseeccdqog dbname=postgres sslmode=verify-full'
 $AgentId = [guid](Read-Host 'UUID da nova conta Auth do Agent A')
