@@ -37,7 +37,16 @@ BEGIN
             ORDER BY id),'UTF8')),'hex') FROM auth.users WHERE id<>agent)
           IS DISTINCT FROM '50c800cec24f925111e15977d39b8f08c3df18705df6eb682ffbd3c5e4e138ef'
        OR (SELECT count(*) FROM reivro_cloud.memberships WHERE project_id=target
-           AND role IN ('reviewer','viewer','worker')) <> 3 THEN
+           AND role IN ('reviewer','viewer','worker')) <> 3
+       OR EXISTS (SELECT FROM reivro_cloud.task_submissions)
+       OR EXISTS (SELECT FROM reivro_cloud.task_contracts)
+       OR EXISTS (SELECT FROM reivro_cloud.task_policies)
+       OR EXISTS (SELECT FROM reivro_cloud.task_corrections)
+       OR EXISTS (SELECT FROM reivro_cloud.execution_leases)
+       OR EXISTS (SELECT FROM reivro_cloud.runs WHERE outcome IS NULL)
+       OR (SELECT count(*) FROM reivro_cloud.events) <> 12
+       OR (SELECT last_value FROM reivro_cloud.events_seq_seq) <> 12
+       OR NOT (SELECT is_called FROM reivro_cloud.events_seq_seq) THEN
         RAISE EXCEPTION 'Expected the four original memberships and the approved project A';
     END IF;
     IF NOT EXISTS (SELECT FROM auth.users WHERE id=agent AND created_at>=threshold

@@ -26,6 +26,15 @@ BEGIN
        OR (SELECT count(*) FROM reivro_cloud.memberships m
            JOIN reivro_cloud.projects p ON p.id=m.project_id
            WHERE p.repository_id=repo AND m.role IN ('reviewer','viewer','worker')) <> 3
+       OR EXISTS (SELECT FROM reivro_cloud.task_submissions)
+       OR EXISTS (SELECT FROM reivro_cloud.task_contracts)
+       OR EXISTS (SELECT FROM reivro_cloud.task_policies)
+       OR EXISTS (SELECT FROM reivro_cloud.task_corrections)
+       OR EXISTS (SELECT FROM reivro_cloud.execution_leases)
+       OR EXISTS (SELECT FROM reivro_cloud.runs WHERE outcome IS NULL)
+       OR (SELECT count(*) FROM reivro_cloud.events) <> 12
+       OR (SELECT last_value FROM reivro_cloud.events_seq_seq) <> 12
+       OR NOT (SELECT is_called FROM reivro_cloud.events_seq_seq)
     THEN RAISE EXCEPTION 'Agent or original inventory differs'; END IF;
 END $$;
 SELECT 'AGENT_A_INVENTORY_PASS' AS status;
