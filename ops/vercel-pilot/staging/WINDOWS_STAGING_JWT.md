@@ -69,6 +69,8 @@ Para cada linha, espere `PASS auth` e dois resultados `PASS … legacy read …`
 
 ## Preparação do agent e das fixtures
 
+Use primeiro o [gate Windows atualizado](WINDOWS_CONTROL_PLANE_GATE.md) para recuperar o backup e executar o provisionamento de Agent A após autorização. Os passos de planejamento de fixtures abaixo se aplicam à fase seguinte.
+
 A auditoria somente leitura encontrou cinco contas, uma sem membership, dois reviewers, um viewer, um worker e zero submissões. Mantenha todas as contas e associações existentes. Antes da primeira escrita, confirme a conclusão das cinco leituras, a suspensão dos outros writers, a cópia de recuperação recente e o escopo sintético A/B. Registre autorização específica por etapa e por identidade. Os valores de confirmação abaixo exigem essa autorização prévia.
 
 Defina o cliente PostgreSQL local. O certificado do Session Pooler deve ser verificável pela instalação do libpq. `-W` solicita senha sem eco. Use psql 15 ou superior.
