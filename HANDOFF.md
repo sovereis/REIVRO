@@ -310,7 +310,22 @@ Próximo gate independente preparado conceitualmente, ainda sem fixture ou autor
 
 Em 28/11/2026, o gate concorrente persistiu o resultado esperado, embora o cliente inicialmente o classificasse como falha. Auditoria administrativa somente leitura confirmou exclusão mútua: journal e sequência `43/true`, três task runs e leases totais, apenas um attempt não nulo na terceira fixture, fence 1, exatamente um `lease_claim` e quatro `task_claim`. Portanto houve um único vencedor; as outras três chamadas seguiram o caminho busy sem duplicar execução. As respostas HTTP individuais não são preservadas no journal, que registra as chamadas e a transição durável, não seus corpos. A causa cliente foi uma condição invertida que contava estados diferentes de `running`/`busy`; ela foi substituída por classificador compartilhado com contagens positivas e testes de regressão, incluindo explicitamente `1 running/3 busy` e o inverso `3 running/1 busy`. Não repetir os claims nem recriar a fixture.
 
-Próximo gate apenas conceitual: concorrência de renew, fail e finish em uma quarta fixture independente, com barreira real, attempt/fence compartilhados e resultado autoritativo previamente validado. A matriz deve definir antes da escrita qual operação pode vencer, provar serialização pelo lock do projeto, exigir exatamente uma transição durável e reconciliar respostas incertas. Cenários de ordens distintas devem usar fixtures separadas; não reutilizar a terceira fixture nem misturar renew/fail/finish no mesmo run após uma transição terminal. Credenciais, payloads e toda validação devem ser coletados antes da janela de 60 segundos. Nenhuma fixture ou script operacional deste gate está autorizada neste checkpoint.
+O kit do próximo gate foi preparado, mas sua execução no staging continua sem
+autorização. Ele cria uma quarta fixture independente, valida a evidência Git
+autoritativa antes do claim e dispara `renew`, `fail` e `finish` sobre o mesmo
+attempt/fence por uma barreira real. As seis ordens de serialização foram cobertas
+em simulação e pelo classificador compartilhado: `fail` ou `finish` encerra uma
+única vez; `renew` só pode persistir se adquirir o lock antes do encerramento.
+Assim, `renew` e `finish` não são tratados como mutuamente exclusivos: são válidos
+em sequência nessa ordem, enquanto qualquer operação posterior ao encerramento
+deve ser negada sem efeito durável. O journal permitido após aprovação, submissão
+e claim é 48–50, conforme a ordem. O postcheck também exige preservação integral
+das três fixtures anteriores, attempt limpo, fence 1, resultado/outcome coerentes,
+sequência reconciliada e ausência de prepared transactions. As respostas HTTP são
+capturadas individualmente em receipt privado apenas com ação, status, sucesso e
+estado, sem corpo, JWT ou credencial. Credenciais e confirmação são coletadas antes
+da janela do lease. O preflight real passou somente por leitura em `43/true`; não
+houve escrita no staging durante a preparação.
 
 Controles 6.4 ainda pendentes, sem repetir os ciclos já comprovados: concorrência de claim acima; concorrência de renew/finish e idempotência de reentrega; falsificação/replay conflitante de digest/HEAD/identidade; revogação de policy concorrente com finish e mudança de policy_set forçando INCONCLUSIVE; remoção de membership com JWT ainda válido; negativas cross-project e escrita direta para as operações restantes; correction authorization/budget; e backup/restore pós-journal 36. Cada controle exige autorização separada. Não alterar os dois runs concluído/terminal já auditados.
 
