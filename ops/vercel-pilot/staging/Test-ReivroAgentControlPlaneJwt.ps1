@@ -43,7 +43,7 @@ function Assert-Success([object]$Response, [string]$Stage) {
 }
 
 function Assert-Denied([object]$Response, [string]$Stage) {
-    if ($Response.Status -notin 400,401,403,404) {
+    if ($Response.Status -notin 400,403) {
         throw "$Stage was not denied (HTTP $($Response.Status))."
     }
 }
