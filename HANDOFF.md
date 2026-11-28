@@ -327,7 +327,49 @@ estado, sem corpo, JWT ou credencial. Credenciais e confirmação são coletadas
 da janela do lease. O preflight real passou somente por leitura em `43/true`; não
 houve escrita no staging durante a preparação.
 
-Controles 6.4 ainda pendentes, sem repetir os ciclos já comprovados: concorrência de claim acima; concorrência de renew/finish e idempotência de reentrega; falsificação/replay conflitante de digest/HEAD/identidade; revogação de policy concorrente com finish e mudança de policy_set forçando INCONCLUSIVE; remoção de membership com JWT ainda válido; negativas cross-project e escrita direta para as operações restantes; correction authorization/budget; e backup/restore pós-journal 36. Cada controle exige autorização separada. Não alterar os dois runs concluído/terminal já auditados.
+Em 28/11/2026, o founder confirmou
+`RENEW_FAIL_FINISH_SINGLE_CLOSER_PASS` em execução real, e a auditoria
+independente somente leitura reconciliou o resultado. A ordem efetivamente
+comprovada no staging foi **renew → fail → finish negado**: `renew` respondeu
+HTTP 200/`running`, `fail` respondeu HTTP 200/`retryable` e `finish` respondeu
+HTTP 403 sem efeito durável. Os eventos 44–50 são, em ordem,
+`task_approve_contract`, `task_submit`, `lease_claim`, `task_claim`,
+`task_renew`, `lease_failure` e `task_fail`. Journal e sequência terminaram em
+`50/true`. Existe exatamente uma quarta fixture: contrato
+`63a442d4-f40d-4647-a89f-0d88b0d68d89`, submissão
+`028707c4-9b98-40df-a309-ed789172970e` e run/lease
+`12e3d13c-d6d0-4a0d-8979-acc7de26f795`. O lease está `retryable`, fence 1,
+com attempt e prazos limpos; submission result, run outcome e report continuam
+nulos. Inventário reconciliado: quatro contratos, quatro submissões, quatro
+runs de tarefa e quatro leases, sem prepared transactions. As três fixtures
+anteriores permanecem integralmente preservadas.
+
+Somente essa ordem possui evidência operacional hospedada. As outras cinco
+ordens da matriz permanecem **validadas apenas em simulação**: renew→finish
+(completed/49), fail→renew e fail→finish (retryable/49), finish→renew e
+finish→fail (completed/48). Não promover essas simulações a evidência de staging
+e não repetir a quarta fixture para tentar cobri-las.
+
+Próximo gate, ainda apenas conceitual e sem autorização de escrita:
+idempotência, reentrega e recuperação após resposta incerta. Usar fixture nova
+e IDs determinísticos registrados em receipt privado antes do primeiro envio.
+O cliente deve introduzir a incerteza somente no transporte local, após enviar
+uma operação autorizada e antes de aceitar sua resposta, sem alterar RPCs ou o
+backend. A recuperação começa obrigatoriamente por reconciliação read-only com
+esses mesmos IDs; nunca gerar substitutos enquanto o efeito original for
+incerto. Uma reentrega byte-equivalente deve reutilizar identidade, digest,
+attempt e fence aplicáveis e provar um único efeito durável, sem segundo run,
+lease, attempt ou transição terminal. Replay divergente deve ser negado sem
+efeito. O kit deverá classificar separadamente: resposta perdida com commit,
+resposta perdida sem commit, resposta conhecida e replay conflitante; registrar
+somente metadados HTTP sanitizados; e reconciliar journal/sequence e preservação
+das quatro fixtures anteriores após cada checkpoint. Definir previamente quais
+chamadas geram evento de auditoria mesmo quando idempotentes, conforme o schema
+real, antes de fixar a cardinalidade esperada. Qualquer timeout, resposta
+ambígua ou receipt inconsistente interrompe o gate para leitura apenas; não há
+retry automático.
+
+Controles 6.4 ainda pendentes, sem repetir os ciclos já comprovados: idempotência/reentrega e recuperação após resposta incerta; falsificação/replay conflitante de digest/HEAD/identidade; revogação de policy concorrente com finish e mudança de policy_set forçando INCONCLUSIVE; remoção de membership com JWT ainda válido; negativas cross-project e escrita direta para as operações restantes; correction authorization/budget; e backup/restore pós-journal 50. Cada controle exige autorização separada. Não alterar as quatro fixtures já auditadas.
 
 ### Papéis a comprovar com JWTs reais
 
