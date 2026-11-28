@@ -389,6 +389,17 @@ distingue explicitamente ausência de commit, resposta perdida com commit,
 resposta conhecida e replay conflitante. Sua execução operacional permanece
 bloqueada até autorização específica.
 
+Na primeira tentativa operacional, todos os guards read-only passaram, mas o
+gate parou durante Auth antes de criar o receipt ou chamar RPCs do Control Plane.
+Auditoria independente confirmou baseline ainda em `50/true`, inventário
+4/4/4/4, zero eventos após 50 e preservação das quatro fixtures. Os logs Auth
+mostraram Reviewer A e Agent A com HTTP 200, seguidos por HTTP 400
+`invalid_credentials`; pela ordem determinística do runner, a falha foi do
+Worker A. Nenhuma senha foi redefinida. O runner passou a identificar o papel
+na mensagem sanitizada, e um diagnóstico separado testa as três identidades
+individualmente, valida seus UUIDs e nunca chama RPCs do Control Plane nem
+imprime e-mail, senha, JWT ou corpo da resposta.
+
 Controles 6.4 ainda pendentes, sem repetir os ciclos já comprovados: idempotência/reentrega e recuperação após resposta incerta; falsificação/replay conflitante de digest/HEAD/identidade; revogação de policy concorrente com finish e mudança de policy_set forçando INCONCLUSIVE; remoção de membership com JWT ainda válido; negativas cross-project e escrita direta para as operações restantes; correction authorization/budget; e backup/restore pós-journal 50. Cada controle exige autorização separada. Não alterar as quatro fixtures já auditadas.
 
 ### Papéis a comprovar com JWTs reais

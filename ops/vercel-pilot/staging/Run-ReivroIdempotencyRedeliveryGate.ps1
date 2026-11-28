@@ -49,7 +49,7 @@ function Assert-Checks([object]$Result,[string]$Label) {
     }
 }
 
-function Login([string]$Email,[string]$Password) {
+function Login([string]$Label,[string]$Email,[string]$Password) {
     $request = [Net.Http.HttpRequestMessage]::new(
         [Net.Http.HttpMethod]::Post,'/auth/v1/token?grant_type=password'
     )
@@ -61,7 +61,7 @@ function Login([string]$Email,[string]$Password) {
         $response = $script:client.SendAsync($request).GetAwaiter().GetResult()
         try {
             if (-not $response.IsSuccessStatusCode) {
-                throw "Login HTTP $([int]$response.StatusCode)"
+                throw "Auth $Label HTTP $([int]$response.StatusCode)"
             }
             $body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult() |
                 ConvertFrom-Json
@@ -267,9 +267,9 @@ try {
     $client = [Net.Http.HttpClient]::new($handler)
     $client.BaseAddress = [uri]'https://lbklqqqbmeyseeccdqog.supabase.co'
     $client.DefaultRequestHeaders.Add('apikey',$publishableKey)
-    $reviewer = Login $reviewerEmail $reviewerPassword
-    $agent = Login $agentEmail $agentPassword
-    $worker = Login $workerEmail $workerPassword
+    $reviewer = Login 'ReviewerA' $reviewerEmail $reviewerPassword
+    $agent = Login 'AgentA' $agentEmail $agentPassword
+    $worker = Login 'WorkerA' $workerEmail $workerPassword
     if ($reviewer.Id -ne [guid]$scope.reviewer_id -or
         $agent.Id -ne [guid]$scope.agent_id -or
         $worker.Id -ne [guid]$scope.worker_id) {
