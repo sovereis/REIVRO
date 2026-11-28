@@ -10,7 +10,7 @@ WITH t AS (
  JOIN reivro_cloud.execution_leases l ON (l.project_id,l.run_id)=(r.project_id,r.id)
  WHERE p.repository_id=:'repository_id'::bigint AND s.id=:'submission_id'::uuid
   AND s.contract_id=:'contract_id'::uuid AND s.digest=:'digest' AND s.base_sha=:'base_sha' AND s.head_sha=:'head_sha'
-  AND s.verifier='task-completion-v1' AND s.result IS NULL AND r.outcome IS NULL AND r.report IS NULL
+  AND s.verifier='task-completion-v1' AND s.policy_set='[]'::jsonb AND s.result IS NULL AND r.outcome IS NULL AND r.report IS NULL
   AND r.task_submission_id=s.id AND l.state='running' AND l.fence=2 AND l.attempt_id IS NOT NULL
   AND l.lease_until<=clock_timestamp() AND l.attempt_until<=clock_timestamp()
   AND (SELECT document FROM reivro_cloud.task_contracts c WHERE (c.project_id,c.id,c.version,c.digest)=(s.project_id,s.contract_id,s.version,s.digest))
