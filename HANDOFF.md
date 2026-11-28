@@ -247,7 +247,8 @@ Fingerprints MD5 relevantes confirmados após 003:
 | Função | MD5 |
 | --- | --- |
 | reivro_cloud.dispatch(text,jsonb) V3 | 5789d2beb5926fbfe2006973dd66d337 |
-| reivro_cloud.dispatch_v1(text,jsonb) | 7b65dd994ca180ed06312d3c0a7820fe || reivro_checks_api.dispatch(text,jsonb) | 33ebec2c2d3ac3c64b6955369778fc61 |
+| reivro_cloud.dispatch_v1(text,jsonb) | 7b65dd994ca180ed06312d3c0a7820fe |
+| reivro_checks_api.dispatch(text,jsonb) | 33ebec2c2d3ac3c64b6955369778fc61 |
 | reivro_checks_api.read_run(bigint,uuid) | 8815aa0cb0ee1f7b6c1d64315bd019d1 |
 
 Owner/security/search_path e ACLs foram inspecionados. Não confundir MD5 de prosrc
@@ -501,6 +502,7 @@ com limites, integridade e destruição adequados.
 - Não declarar mocks/fixtures como integração hospedada, segundo ambiente local
   como segunda máquina, relatório do founder como auditoria independente, ou
   detecção como prevenção efetiva.
+
 ## 11. Trabalhos locais e recuperação de contexto
 
 No Cloud desta conversa há worktrees separados para as fases históricas. Não
