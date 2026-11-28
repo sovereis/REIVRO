@@ -1,0 +1,9 @@
+{
+  "fixture": "reivro-control-plane-project-a-v1",
+  "synthetic": true,
+  "criterion": {
+    "kind": "exists",
+    "path": "guide.md"
+  },
+  "private_alpha": "blocked"
+}
