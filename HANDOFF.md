@@ -369,6 +369,26 @@ real, antes de fixar a cardinalidade esperada. Qualquer timeout, resposta
 ambígua ou receipt inconsistente interrompe o gate para leitura apenas; não há
 retry automático.
 
+O kit desse gate foi posteriormente preparado e publicado sem execução no
+staging. A análise do schema real fixou garantias diferentes por RPC:
+`approve_contract` não é retry-safe (a mesma PK volta como conflito), portanto
+uma resposta incerta exige reconciliação e nunca reenvio cego; `submit` reconhece
+replay byte-equivalente do mesmo ID como `duplicate`, retorna antes de inserir
+novo `task_submit` e nega payload divergente sem efeito; `claim` reenviado com o
+mesmo delivery enquanto o lease está ativo retorna `busy`, preserva um único
+run/lease/attempt e um único `lease_claim`, mas cada chamada aceita acrescenta
+um `task_claim`. O critério previsto parte de `50/true`: approve 51, submit 52,
+replay exato e replay conflitante de submit permanecem em 52, claim cuja resposta
+é descartada pelo cliente produz 54, e sua reentrega exata busy produz 55. O
+postcheck exige `55/true`, inventário 5/5/5/5, fence 1 e exatamente um efeito
+durável, além da preservação das quatro fixtures anteriores. IDs, JSON exato e
+SHA-256 dos payloads são gravados e relidos do receipt privado antes do primeiro
+envio. A perda é simulada somente no cliente, descartando status/body depois da
+conclusão do request; nenhuma RPC ou configuração do backend é alterada. O kit
+distingue explicitamente ausência de commit, resposta perdida com commit,
+resposta conhecida e replay conflitante. Sua execução operacional permanece
+bloqueada até autorização específica.
+
 Controles 6.4 ainda pendentes, sem repetir os ciclos já comprovados: idempotência/reentrega e recuperação após resposta incerta; falsificação/replay conflitante de digest/HEAD/identidade; revogação de policy concorrente com finish e mudança de policy_set forçando INCONCLUSIVE; remoção de membership com JWT ainda válido; negativas cross-project e escrita direta para as operações restantes; correction authorization/budget; e backup/restore pós-journal 50. Cada controle exige autorização separada. Não alterar as quatro fixtures já auditadas.
 
 ### Papéis a comprovar com JWTs reais
