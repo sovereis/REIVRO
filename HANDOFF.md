@@ -247,8 +247,7 @@ Fingerprints MD5 relevantes confirmados após 003:
 | Função | MD5 |
 | --- | --- |
 | reivro_cloud.dispatch(text,jsonb) V3 | 5789d2beb5926fbfe2006973dd66d337 |
-| reivro_cloud.dispatch_v1(text,jsonb) | 7b65dd994ca180ed06312d3c0a7820fe |
-| reivro_checks_api.dispatch(text,jsonb) | 33ebec2c2d3ac3c64b6955369778fc61 |
+| reivro_cloud.dispatch_v1(text,jsonb) | 7b65dd994ca180ed06312d3c0a7820fe || reivro_checks_api.dispatch(text,jsonb) | 33ebec2c2d3ac3c64b6955369778fc61 |
 | reivro_checks_api.read_run(bigint,uuid) | 8815aa0cb0ee1f7b6c1d64315bd019d1 |
 
 Owner/security/search_path e ACLs foram inspecionados. Não confundir MD5 de prosrc
@@ -302,7 +301,11 @@ Próximo gate: recuperação controlada do lease expirado deve reutilizar o mesm
 
 Em 28/11/2026, o founder reportou `FIRST_CONTROL_PLANE_TASK_COMPLETED_STATIC_ONLY`. Auditoria administrativa independente somente leitura confirmou um único task run e lease, fence 3, lease `completed`, attempt/lease windows limpos, resultado autoritativo `VERIFIED`, evidence digest SHA-256 estruturalmente válido e `runs.outcome=INCONCLUSIVE` legado preservado com report idêntico ao result. BASE, HEAD, digest, verifier e policy_set permanecem vinculados. O journal está em `21/true`, com três `lease_claim`, três `task_claim` e um `task_finish`; não existem eventos de renew ou fail. Este é o primeiro ciclo operacional estático completo do Control Plane no staging, não execução funcional arbitrária e não liberação da Private Alpha.
 
-Controles 6.4 ainda pendentes, sem repetir o ciclo já comprovado: renew positivo dentro do lease e negação após perda; fail retryable e terminal/exhaustion; concorrência real de claim/renew/finish e idempotência de reentrega; falsificação/replay conflitante de digest/HEAD/identidade; revogação de policy concorrente com finish e mudança de policy_set forçando INCONCLUSIVE; remoção de membership com JWT ainda válido; negativas cross-project e escrita direta para as operações restantes; correction authorization/budget; e backup/restore pós-journal 21. Esses testes exigem novas fixtures sintéticas isoladas e autorizações separadas. Não reutilizar nem alterar o run concluído.
+Em 28/11/2026, o founder reportou o sucesso do gate independente Renew/Fail. A auditoria administrativa somente leitura confirmou a segunda fixture sintética: contrato e submissão distintos, vínculos de digest/BASE/HEAD válidos, um renew persistido e fail em estado `retryable`, fence 1, attempt e janelas limpos, sem result/outcome/report. O journal é contíguo em `28/true`: exatamente um `task_renew`, um `lease_failure` e um `task_fail`; os probes com attempt e fence incorretos não deixaram eventos nem alteração durável. A negação das respostas HTTP permanece evidência reportada pelo founder; a auditoria independente comprova sua ausência de efeito persistente. O primeiro run continua integralmente preservado em `completed`, fence 3, resultado `VERIFIED`, outcome legado `INCONCLUSIVE` e report idêntico ao resultado. Há zero transações preparadas.
+
+Próximo gate independente preparado, ainda não autorizado: continuar somente a segunda fixture `retryable`, sem criar contrato ou submissão. O fluxo esperado é claim fence 2 → journal 30; fail retryable → 32; claim fence 3 → 34; fail por esgotamento → estado `terminal` e journal 36. Cada fase deve reconciliar run, lease, attempt, fence e cardinalidade exata dos eventos antes de avançar. Ao final, attempt e janelas devem estar limpos, o run deve registrar `outcome=ERROR`, a submissão deve permanecer sem resultado e não deve existir `task_finish`. O primeiro run concluído é guard imutável. Reutilizar receipt privado, login do Worker A, validação compartilhada, prompts prévios à janela e reconciliação do kit Renew/Fail; interromper em resposta incerta e não repetir automaticamente.
+
+Controles 6.4 ainda pendentes, sem repetir os ciclos já comprovados: esgotamento/terminal acima; concorrência real de claim/renew/finish e idempotência de reentrega; falsificação/replay conflitante de digest/HEAD/identidade; revogação de policy concorrente com finish e mudança de policy_set forçando INCONCLUSIVE; remoção de membership com JWT ainda válido; negativas cross-project e escrita direta para as operações restantes; correction authorization/budget; e backup/restore pós-journal 28. Cada controle exige autorização separada. Não alterar o primeiro run concluído.
 
 ### Papéis a comprovar com JWTs reais
 
@@ -498,7 +501,6 @@ com limites, integridade e destruição adequados.
 - Não declarar mocks/fixtures como integração hospedada, segundo ambiente local
   como segunda máquina, relatório do founder como auditoria independente, ou
   detecção como prevenção efetiva.
-
 ## 11. Trabalhos locais e recuperação de contexto
 
 No Cloud desta conversa há worktrees separados para as fases históricas. Não
